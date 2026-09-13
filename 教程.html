@@ -1,0 +1,2849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#ededed" />
+<title>字卡聊天</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --bg-page:#ededed;
+    --bg-soft:#f7f7f7;
+    --line:#e5e5e5;
+    --text:#191919;
+    --text-2:#888888;
+    --text-3:#b2b2b2;
+    --accent:#07c160;
+    --accent-press:#06ad56;
+    --danger:#fa5151;
+    --app-h:100dvh;
+    --chat-wall:#ededed;
+    --bubble-me:#95ec69;
+    --bubble-you:#ffffff;
+    --bubble-me-text:#191919;
+    --bubble-you-text:#191919;
+    --bubble-radius:6px;
+  }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+
+  html,body{
+    height:100%;margin:0;padding:0;overflow:hidden;overscroll-behavior:none;
+  }
+
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:var(--bg-page);color:var(--text);font-size:17px;line-height:1.4;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  [hidden]{display:none !important;}
+
+  .app{
+    position:relative;width:100%;height:var(--app-h);max-height:var(--app-h);
+    background:var(--bg);display:flex;flex-direction:column;overflow:hidden;
+  }
+
+  .stage{
+    flex:1 1 auto;position:relative;overflow:hidden;min-height:0;background:var(--bg-page);
+  }
+
+  .view{
+    position:absolute;inset:0;display:none;flex-direction:column;
+    background:var(--bg-page);overflow:hidden;
+  }
+  .view.active{display:flex;}
+
+  @keyframes slideIn{
+    from{transform:translateX(100%);}
+    to{transform:translateX(0);}
+  }
+  .view.slide.active{animation:slideIn .24s cubic-bezier(.32,.72,0,1);}
+
+  /* ---------- 顶栏 ---------- */
+  .navbar{
+    flex:0 0 auto;position:relative;display:flex;align-items:center;justify-content:center;
+    height:calc(48px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 8px 0;
+    background:#ededed;border-bottom:1px solid #dcdcdc;
+  }
+  .navbar .title{font-size:17px;font-weight:600;letter-spacing:.2px;}
+  .navbar .left,
+  .navbar .right{
+    position:absolute;top:env(safe-area-inset-top);height:48px;
+    display:flex;align-items:center;gap:2px;
+  }
+  .navbar .left{left:8px;}
+  .navbar .right{right:8px;}
+
+  .nav-btn{
+    min-width:32px;height:36px;padding:0 8px;border:none;border-radius:6px;
+    background:transparent;color:var(--text);font-family:inherit;font-size:16px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    transition:background .15s ease;
+  }
+  .nav-btn:active{background:rgba(0,0,0,.06);}
+  .nav-btn .icon{width:24px;height:24px;}
+
+  .chat-title-btn{
+    max-width:60%;display:flex;align-items:center;gap:4px;
+    border:none;background:transparent;padding:4px 8px;border-radius:6px;
+    font-family:inherit;font-size:17px;font-weight:600;color:var(--text);
+    cursor:pointer;transition:background .12s ease;
+  }
+  .chat-title-btn:active{background:rgba(0,0,0,.06);}
+  .chat-title-btn .name{
+    max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .chat-title-btn .icon{width:16px;height:16px;color:var(--text-3);}
+
+  /* ---------- 图标 ---------- */
+  .icon{
+    width:22px;height:22px;display:block;fill:none;stroke:currentColor;
+    stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto;
+  }
+  .icon.sm{width:18px;height:18px;}
+  .icon.xs{width:15px;height:15px;}
+  .icon.md{width:26px;height:26px;}
+
+  .scroll{
+    flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:var(--bg);
+  }
+
+  /* ---------- 列表 ---------- */
+  .group{background:#fff;margin-top:10px;}
+  .group:first-child{margin-top:0;}
+
+  .cell{
+    position:relative;display:flex;align-items:center;gap:12px;width:100%;
+    padding:13px 16px;border:none;background:#fff;text-align:left;
+    font-family:inherit;font-size:17px;color:inherit;cursor:pointer;
+    transition:background .12s ease;
+  }
+  .cell:active{background:#f2f2f2;}
+  .cell::after{
+    content:"";position:absolute;left:60px;right:0;bottom:0;height:1px;
+    background:var(--line);transform:scaleY(.5);transform-origin:bottom;
+  }
+  .cell:last-child::after{display:none;}
+  .cell.no-line::after{display:none;}
+  .cell.no-avatar::after{left:16px;}
+
+  .cell .arrow{color:var(--text-3);flex:0 0 auto;}
+  .cell .label{
+    flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .cell .value{flex:0 0 auto;color:var(--text-2);font-size:15px;}
+
+  /* ---------- 头像 ---------- */
+  .avatar{
+    width:44px;height:44px;border-radius:6px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;color:#fff;
+    font-size:17px;font-weight:500;user-select:none;overflow:hidden;
+  }
+  .avatar img{width:100%;height:100%;object-fit:cover;display:block;}
+  .avatar.round{border-radius:50%;}
+  .avatar.lg{width:64px;height:64px;font-size:24px;border-radius:8px;}
+  .avatar.xl{width:72px;height:72px;font-size:28px;border-radius:8px;}
+
+  /* ---------- 消息列表 ---------- */
+  #chatList{background:#fff;}
+
+  .conv{
+    position:relative;display:flex;align-items:center;gap:12px;width:100%;
+    padding:11px 16px;border:none;background:#fff;text-align:left;
+    font-family:inherit;color:inherit;cursor:pointer;transition:background .12s ease;
+  }
+  .conv:active{background:#f2f2f2;}
+  .conv::after{
+    content:"";position:absolute;left:72px;right:0;bottom:0;height:1px;
+    background:var(--line);transform:scaleY(.5);transform-origin:bottom;
+  }
+  .conv:last-child::after{display:none;}
+
+  .conv-main{flex:1 1 auto;min-width:0;}
+  .conv-row{display:flex;align-items:center;gap:8px;}
+  .conv-row + .conv-row{margin-top:3px;}
+  .conv-name{
+    flex:1 1 auto;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .conv-time{flex:0 0 auto;font-size:12px;color:var(--text-3);}
+  .conv-preview{
+    flex:1 1 auto;font-size:14px;color:var(--text-2);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .badge{
+    flex:0 0 auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+    background:var(--danger);color:#fff;font-size:11px;font-weight:500;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ---------- 通讯录 ---------- */
+  .index-letter{padding:4px 16px;background:#f7f7f7;font-size:13px;color:var(--text-2);}
+
+  /* ---------- 发现 / 我 ---------- */
+  .discover-icon{
+    width:26px;height:26px;border-radius:6px;display:flex;align-items:center;
+    justify-content:center;color:#fff;flex:0 0 auto;
+  }
+  .discover-icon .icon{width:16px;height:16px;stroke-width:1.9;}
+
+  .profile-header{
+    display:flex;align-items:center;gap:16px;padding:30px 16px 26px;
+    background:#fff;cursor:pointer;transition:background .12s ease;
+  }
+  .profile-header:active{background:#f2f2f2;}
+  .profile-info{flex:1 1 auto;min-width:0;}
+  .profile-name{font-size:22px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .profile-id{font-size:14px;color:var(--text-2);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .profile-sign{font-size:13px;color:var(--text-3);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  /* ---------- 聊天窗口 ---------- */
+  #viewChat{background:var(--chat-wall);}
+  .chat-nav{background:#ededed;border-bottom:1px solid #dcdcdc;}
+  .msg-scroll{background:var(--chat-wall);padding:14px 12px 8px;}
+
+  .msg-row{
+    display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;animation:pop .18s ease;
+  }
+  .msg-row.me{flex-direction:row-reverse;}
+  .msg-row .avatar{width:38px;height:38px;font-size:15px;border-radius:5px;}
+
+  .bubble{
+    position:relative;max-width:70%;padding:10px 13px;
+    border-radius:var(--bubble-radius);background:var(--bubble-you);
+    color:var(--bubble-you-text);font-size:16.5px;line-height:1.45;
+    white-space:pre-wrap;word-break:break-word;overflow:hidden;
+  }
+  .msg-row.me .bubble{background:var(--bubble-me);color:var(--bubble-me-text);}
+  .bubble::before{
+    content:"";position:absolute;top:12px;left:-5px;width:10px;height:10px;
+    background:inherit;transform:rotate(45deg);
+  }
+  .msg-row.me .bubble::before{left:auto;right:-5px;}
+  .no-tail .bubble::before{display:none;}
+
+  .bubble img{
+    display:block;max-width:200px;max-height:200px;border-radius:4px;
+  }
+  .bubble .card-title{
+    font-weight:600;font-size:15px;margin-bottom:4px;
+    padding-bottom:4px;border-bottom:1px dashed rgba(0,0,0,.12);
+  }
+  .bubble .card-content{font-size:14.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;}
+  .bubble .card-tag{
+    display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;
+    background:rgba(0,0,0,.06);font-size:12px;
+  }
+
+  @keyframes pop{
+    from{opacity:0;transform:translateY(4px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+
+  .stamp{font-size:11px;color:#a0a0a0;margin-top:5px;padding:0 4px;}
+  .msg-row.me .stamp{text-align:right;}
+  .msg-row .stamp{text-align:left;}
+
+  /* 输入中动画 */
+  .typing{
+    display:flex;align-items:center;gap:4px;padding:13px 14px;
+    background:var(--bubble-you);border-radius:var(--bubble-radius);
+  }
+  .typing i{
+    display:block;width:6px;height:6px;border-radius:50%;background:#b6bcc6;
+    animation:blink 1.3s infinite ease-in-out;
+  }
+  .typing i:nth-child(2){animation-delay:.16s;}
+  .typing i:nth-child(3){animation-delay:.32s;}
+  @keyframes blink{
+    0%,60%,100%{opacity:.35;transform:translateY(0);}
+    30%{opacity:1;transform:translateY(-3px);}
+  }
+
+  /* ---------- 输入栏 ---------- */
+  .composer{
+    flex:0 0 auto;display:flex;align-items:center;gap:6px;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    background:#f7f7f7;border-top:1px solid #dcdcdc;
+  }
+  .composer input{
+    flex:1 1 auto;min-width:0;height:40px;padding:0 12px;border:none;outline:none;
+    border-radius:5px;background:#fff;font-family:inherit;font-size:16.5px;color:var(--text);
+  }
+  .composer input::placeholder{color:var(--text-3);}
+
+  .send-btn{
+    width:58px;height:40px;padding:0;flex:0 0 auto;border:none;border-radius:5px;
+    background:var(--accent);color:#fff;font-family:inherit;font-size:15px;
+    font-weight:500;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:opacity .18s ease, background .12s ease;
+  }
+  .send-btn:active{background:var(--accent-press);}
+  .send-btn:disabled{opacity:.4;cursor:default;}
+
+  .card-btn{
+    width:40px;height:40px;padding:0;flex:0 0 auto;border:none;border-radius:5px;
+    background:#fff;color:var(--accent);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:background .12s ease;
+    box-shadow:0 0 0 1px var(--line) inset;
+  }
+  .card-btn:active{background:#f0f0f0;}
+  .card-btn .icon{width:22px;height:22px;}
+
+  .album-btn{
+    width:40px;height:40px;padding:0;flex:0 0 auto;border:none;border-radius:5px;
+    background:#fff;color:var(--text);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:background .12s ease;
+    box-shadow:0 0 0 1px var(--line) inset;
+  }
+  .album-btn:active{background:#f0f0f0;}
+  .album-btn .icon{width:22px;height:22px;}
+
+  /* ---------- 底部导航 ---------- */
+  .tabbar{
+    flex:0 0 auto;display:flex;align-items:stretch;background:#f7f7f7;
+    border-top:1px solid #dcdcdc;padding-bottom:env(safe-area-inset-bottom);
+  }
+  .app.chat-open .tabbar{display:none;}
+
+  .tab{
+    position:relative;flex:1 1 0;height:54px;padding:0;border:none;background:transparent;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    font-family:inherit;font-size:11px;color:#7a7a7a;cursor:pointer;transition:color .15s ease;
+  }
+  .tab.active{color:var(--accent);}
+  .tab .icon{width:25px;height:25px;stroke-width:1.6;}
+
+  .tab .dot{
+    position:absolute;top:7px;right:50%;margin-right:-22px;min-width:16px;height:16px;
+    padding:0 4px;border-radius:8px;background:var(--danger);color:#fff;
+    font-size:10px;font-weight:500;display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ---------- 表单 ---------- */
+  .form-group{background:#fff;margin-top:10px;}
+  .form-row{
+    position:relative;display:flex;align-items:center;gap:12px;padding:12px 16px;background:#fff;
+  }
+  .form-row::after{
+    content:"";position:absolute;left:16px;right:0;bottom:0;height:1px;
+    background:var(--line);transform:scaleY(.5);transform-origin:bottom;
+  }
+  .form-row:last-child::after{display:none;}
+  .form-row .label{flex:0 0 76px;font-size:17px;color:var(--text);}
+  .form-row input,
+  .form-row select,
+  .form-row textarea{
+    flex:1 1 auto;min-width:0;border:none;outline:none;background:transparent;
+    font-family:inherit;font-size:17px;color:var(--text);
+  }
+  .form-row textarea{resize:none;min-height:44px;line-height:1.45;padding-top:2px;}
+  .form-row input::placeholder,
+  .form-row textarea::placeholder{color:var(--text-3);}
+
+  .form-hint{padding:8px 16px 16px;font-size:13px;color:var(--text-2);line-height:1.5;}
+
+  .btn-primary{
+    display:block;width:calc(100% - 32px);margin:24px 16px 16px;height:46px;
+    border:none;border-radius:6px;background:var(--accent);color:#fff;
+    font-family:inherit;font-size:17px;font-weight:500;cursor:pointer;
+    transition:background .12s ease, opacity .18s ease;
+  }
+  .btn-primary:active{background:var(--accent-press);}
+  .btn-primary:disabled{opacity:.4;cursor:default;}
+
+  .btn-danger{
+    display:block;width:calc(100% - 32px);margin:16px;height:46px;border:none;
+    border-radius:6px;background:#fff;color:var(--danger);font-family:inherit;
+    font-size:17px;font-weight:500;cursor:pointer;transition:background .12s ease;
+  }
+  .btn-danger:active{background:#f2f2f2;}
+
+  .avatar-picker{
+    display:flex;align-items:center;gap:14px;padding:18px 16px;background:#fff;
+    cursor:pointer;transition:background .12s ease;
+  }
+  .avatar-picker:active{background:#f2f2f2;}
+  .avatar-picker .txt{font-size:15px;color:var(--text-2);}
+
+  /* ---------- 字卡 ---------- */
+  .card-input-area{padding:16px;background:#fff;}
+  .card-input-area textarea{
+    width:100%;min-height:150px;border:none;outline:none;resize:none;
+    font-family:inherit;font-size:16px;line-height:1.6;color:var(--text);background:transparent;
+  }
+  .card-input-area textarea::placeholder{color:var(--text-3);}
+
+  .card-actions{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:12px 16px;background:#f7f7f7;border-top:1px solid var(--line);
+  }
+  .card-actions .hint{font-size:13px;color:var(--text-2);flex:1 1 auto;}
+  .card-add-btn{
+    flex:0 0 auto;height:38px;padding:0 20px;border:none;border-radius:19px;
+    background:var(--accent);color:#fff;font-family:inherit;font-size:15px;
+    font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;
+    transition:background .12s ease;
+  }
+  .card-add-btn:active{background:var(--accent-press);}
+  .card-add-btn .icon{width:18px;height:18px;}
+
+  .card-item{
+    display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:#fff;position:relative;
+  }
+  .card-item::after{
+    content:"";position:absolute;left:16px;right:0;bottom:0;height:1px;
+    background:var(--line);transform:scaleY(.5);
+  }
+  .card-item:last-child::after{display:none;}
+  .card-item .card-main{flex:1 1 auto;min-width:0;}
+  .card-item .card-title{
+    font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .card-item .card-content{
+    font-size:14px;color:var(--text-2);margin-top:4px;white-space:pre-wrap;word-break:break-word;
+  }
+  .card-item .card-tag{
+    display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;
+    background:#f0f2f5;font-size:12px;color:var(--text-2);
+  }
+  .card-item .card-del{
+    flex:0 0 auto;width:28px;height:28px;border:none;border-radius:50%;background:transparent;
+    color:var(--text-3);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:background .12s ease, color .12s ease;
+  }
+  .card-item .card-del:active{background:#ffecec;color:var(--danger);}
+
+  /* ---------- 壁纸 ---------- */
+  .wall-grid{
+    display:grid;grid-template-columns:repeat(4, 1fr);gap:10px;padding:16px;background:#fff;
+  }
+  .wall-item{
+    aspect-ratio:9/16;border-radius:8px;border:2px solid transparent;cursor:pointer;
+    overflow:hidden;position:relative;background-size:cover;background-position:center;
+    transition:border-color .15s ease;
+  }
+  .wall-item.active{border-color:var(--accent);}
+  .wall-item .check{
+    position:absolute;right:5px;bottom:5px;width:18px;height:18px;border-radius:50%;
+    background:var(--accent);color:#fff;display:none;align-items:center;justify-content:center;
+  }
+  .wall-item.active .check{display:flex;}
+  .wall-item .check .icon{width:12px;height:12px;stroke-width:2.4;}
+
+  .wall-pick{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    margin:0 16px 16px;height:46px;border:none;border-radius:6px;
+    background:#fff;color:var(--accent);font-family:inherit;font-size:16px;
+    font-weight:500;cursor:pointer;box-shadow:0 0 0 1px var(--line) inset;
+    transition:background .12s ease;
+  }
+  .wall-pick:active{background:#f2f2f2;}
+  .wall-pick .icon{width:20px;height:20px;}
+
+  /* ---------- 气泡 ---------- */
+  .bubble-grid{
+    display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;padding:16px;background:#fff;
+  }
+  .bubble-option{
+    border:2px solid transparent;border-radius:8px;padding:10px 8px;background:#f7f7f7;
+    cursor:pointer;transition:border-color .15s ease;
+  }
+  .bubble-option.active{border-color:var(--accent);}
+  .bubble-option .preview{display:flex;flex-direction:column;gap:6px;}
+  .bubble-option .p-you,
+  .bubble-option .p-me{
+    padding:6px 10px;border-radius:12px;font-size:12px;max-width:100%;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .bubble-option .p-you{background:#fff;align-self:flex-start;border-bottom-left-radius:3px;}
+  .bubble-option .p-me{background:#95ec69;align-self:flex-end;border-bottom-right-radius:3px;}
+  .bubble-option .opt-name{margin-top:8px;font-size:12px;color:var(--text-2);text-align:center;}
+
+  /* ---------- 朋友圈 ---------- */
+  .moment{
+    display:flex;gap:12px;padding:16px;background:#fff;position:relative;
+  }
+  .moment::after{
+    content:"";position:absolute;left:70px;right:0;bottom:0;height:1px;
+    background:var(--line);transform:scaleY(.5);
+  }
+  .moment:last-child::after{display:none;}
+  .moment-main{flex:1 1 auto;min-width:0;}
+  .moment-name{font-size:16px;font-weight:600;color:#576b95;}
+  .moment-text{font-size:15.5px;margin-top:6px;white-space:pre-wrap;word-break:break-word;}
+  .moment-imgs{
+    display:grid;grid-template-columns:repeat(3, 1fr);gap:4px;margin-top:8px;
+  }
+  .moment-imgs img{
+    width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block;
+  }
+  .moment-meta{
+    display:flex;align-items:center;gap:10px;margin-top:8px;
+    font-size:13px;color:var(--text-3);
+  }
+  .moment-meta .time{flex:1 1 auto;}
+  .moment-del{
+    border:none;background:transparent;color:var(--text-3);cursor:pointer;
+    font-family:inherit;font-size:13px;padding:2px 6px;border-radius:4px;
+  }
+  .moment-del:active{background:#f2f2f2;color:var(--danger);}
+
+  .moment-pub{padding:16px;background:#fff;}
+  .moment-pub textarea{
+    width:100%;min-height:90px;border:none;outline:none;resize:none;
+    font-family:inherit;font-size:16px;line-height:1.5;color:var(--text);background:transparent;
+  }
+  .moment-pub textarea::placeholder{color:var(--text-3);}
+  .moment-pub-imgs{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;
+  }
+  .moment-pub-imgs .thumb{
+    position:relative;width:80px;height:80px;border-radius:6px;overflow:hidden;
+  }
+  .moment-pub-imgs .thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .moment-pub-imgs .thumb button{
+    position:absolute;top:2px;right:2px;width:20px;height:20px;border:none;border-radius:50%;
+    background:rgba(0,0,0,.55);color:#fff;font-size:12px;line-height:1;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  }
+  .moment-tools{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
+  }
+  .moment-tools .tool{
+    display:flex;align-items:center;gap:6px;border:none;background:transparent;
+    color:var(--accent);font-family:inherit;font-size:15px;cursor:pointer;padding:6px 8px;
+    border-radius:6px;
+  }
+  .moment-tools .tool:active{background:#f2f2f2;}
+  .moment-tools .tool .icon{width:20px;height:20px;stroke-width:1.8;}
+  .moment-tools .pub-btn{
+    border:none;background:var(--accent);color:#fff;font-family:inherit;font-size:15px;
+    font-weight:500;padding:0 18px;height:36px;border-radius:6px;cursor:pointer;
+    transition:background .12s ease;
+  }
+  .moment-tools .pub-btn:active{background:var(--accent-press);}
+  .moment-tools .pub-btn:disabled{opacity:.4;cursor:default;}
+
+  /* ---------- 设置：速度 ---------- */
+  .speed-slider-wrap{
+    padding:18px 16px;background:#fff;
+  }
+  .speed-slider-wrap .slider-label{
+    display:flex;align-items:center;justify-content:space-between;
+    font-size:14px;color:var(--text-2);margin-bottom:10px;
+  }
+  .speed-slider{
+    width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
+    background:#e5e5e5;outline:none;cursor:pointer;
+  }
+  .speed-slider::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;
+    background:var(--accent);cursor:pointer;border:2px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.2);
+  }
+  .speed-slider::-moz-range-thumb{
+    width:20px;height:20px;border-radius:50%;background:var(--accent);
+    cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2);
+  }
+
+  .speed-options{
+    display:flex;flex-direction:column;gap:0;background:#fff;
+  }
+  .speed-opt{
+    position:relative;display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;border:none;background:#fff;font-family:inherit;font-size:17px;
+    color:var(--text);cursor:pointer;text-align:left;transition:background .12s ease;
+  }
+  .speed-opt:active{background:#f2f2f2;}
+  .speed-opt::after{
+    content:"";position:absolute;left:16px;right:0;bottom:0;height:1px;
+    background:var(--line);transform:scaleY(.5);
+  }
+  .speed-opt:last-child::after{display:none;}
+  .speed-opt .opt-check{
+    color:var(--accent);display:none;
+  }
+  .speed-opt.active .opt-check{display:block;}
+  .speed-opt .icon{width:20px;height:20px;}
+
+  /* ---------- 联系人资料页壁纸 ---------- */
+  .contact-wall-preview{
+    margin:0 16px 10px;border-radius:8px;overflow:hidden;height:120px;
+    background-size:cover;background-position:center;
+    box-shadow:0 0 0 1px var(--line) inset;
+  }
+
+  /* ---------- 数据统计 ---------- */
+  .data-stats{
+    display:grid;grid-template-columns:repeat(2, 1fr);gap:1px;
+    background:var(--line);margin-top:10px;
+  }
+  .data-stat{
+    background:#fff;padding:16px;text-align:center;
+  }
+  .data-stat .num{
+    font-size:22px;font-weight:600;color:var(--accent);
+  }
+  .data-stat .lbl{
+    font-size:13px;color:var(--text-2);margin-top:4px;
+  }
+
+  /* ---------- 轻提示 ---------- */
+  .toast{
+    position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(10px);
+    z-index:10000;max-width:80%;padding:10px 18px;border-radius:6px;
+    background:rgba(0,0,0,.72);color:#fff;font-size:14px;opacity:0;pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease;white-space:pre-line;text-align:center;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .scroll::-webkit-scrollbar{width:5px;}
+  .scroll::-webkit-scrollbar-thumb{background:#d8d8d8;border-radius:3px;}
+  .scroll::-webkit-scrollbar-track{background:transparent;}
+
+  .hidden-file{position:absolute;width:0;height:0;opacity:0;pointer-events:none;}
+
+  .empty-tip{
+    padding:60px 24px;text-align:center;color:var(--text-2);font-size:15px;
+  }
+</style>
+</head>
+<body>
+
+<!-- SVG 图标 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.6"/><path d="M20 20l-3.8-3.8"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16a1 1 0 011 1v9a1 1 0 01-1 1H9.6L5.8 19.4V16H4a1 1 0 01-1-1V6a1 1 0 011-1z"/></symbol>
+    <symbol id="i-contacts" viewBox="0 0 24 24">
+      <circle cx="12" cy="8" r="3.5"/>
+      <path d="M5 19.5c0-3.6 3.1-6 7-6s7 2.4 7 6"/>
+      <path d="M5 5.5h2M5 9h2M17 5.5h2M17 9h2"/>
+    </symbol>
+    <symbol id="i-discover" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8.6"/>
+      <path d="M15.5 8.5l-2 5-5 2 2-5 5-2z"/>
+    </symbol>
+    <symbol id="i-me" viewBox="0 0 24 24">
+      <circle cx="12" cy="8" r="3.6"/>
+      <path d="M4.8 20c0-3.8 3.2-6.4 7.2-6.4s7.2 2.6 7.2 6.4"/>
+    </symbol>
+    <symbol id="i-add-friend" viewBox="0 0 24 24">
+      <circle cx="10" cy="8" r="3.4"/>
+      <path d="M3.6 19.4c0-3.4 2.9-5.6 6.4-5.6 1.5 0 2.9.4 4 1.1"/>
+      <path d="M17.5 14.5v6M14.5 17.5h6"/>
+    </symbol>
+    <symbol id="i-card" viewBox="0 0 24 24">
+      <rect x="3" y="5.5" width="18" height="13" rx="2"/>
+      <path d="M3 9.5h18"/>
+      <path d="M7 14h4"/>
+    </symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24">
+      <path d="M4 20h4l10-10-4-4L4 16v4z"/>
+      <path d="M14.5 5.5l4 4"/>
+    </symbol>
+    <symbol id="i-qr" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="6" height="6" rx="1"/>
+      <rect x="14" y="4" width="6" height="6" rx="1"/>
+      <rect x="4" y="14" width="6" height="6" rx="1"/>
+      <path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z"/>
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4L18 18M18 6l-1.6 1.6M7.6 16.4L6 18"/>
+    </symbol>
+    <symbol id="i-moments" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8.6"/>
+      <path d="M8.5 13.5l3 2.2 4.5-6"/>
+    </symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24">
+      <path d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16"/>
+      <path d="M4 12h16"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></symbol>
+    <symbol id="i-wallpaper" viewBox="0 0 24 24">
+      <rect x="3" y="4" width="18" height="16" rx="2"/>
+      <circle cx="8.5" cy="9.5" r="1.5"/>
+      <path d="M3 16l5-4 4 3 3-3 6 5"/>
+    </symbol>
+    <symbol id="i-bubble" viewBox="0 0 24 24">
+      <path d="M4 6h16a1 1 0 011 1v9a1 1 0 01-1 1H9.6L5.8 20V17H4a1 1 0 01-1-1V7a1 1 0 011-1z"/>
+    </symbol>
+    <symbol id="i-image" viewBox="0 0 24 24">
+      <rect x="3" y="4" width="18" height="16" rx="2"/>
+      <circle cx="8.5" cy="9.5" r="1.5"/>
+      <path d="M3 16l5-4 4 3 3-3 6 5"/>
+    </symbol>
+    <symbol id="i-magic" viewBox="0 0 24 24">
+      <path d="M5 19L16 8"/>
+      <path d="M14 6l4 4"/>
+      <path d="M18 4v3M20.5 5.5h-3M9 4v2M10 5H8M4 11h2M5 10v2"/>
+    </symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24">
+      <path d="M4 8h2.6l1.2-2h8.4l1.2 2H20a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/>
+      <circle cx="12" cy="13" r="3.2"/>
+    </symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24">
+      <circle cx="12" cy="13" r="8"/>
+      <path d="M12 9v4l2.5 2M9 2.5h6"/>
+    </symbol>
+    <symbol id="i-export" viewBox="0 0 24 24">
+      <path d="M12 15V3M8 7l4-4 4 4"/>
+      <path d="M4 15v4a1 1 0 001 1h14a1 1 0 001-1v-4"/>
+    </symbol>
+    <symbol id="i-import" viewBox="0 0 24 24">
+      <path d="M12 3v12M8 11l4 4 4-4"/>
+      <path d="M4 15v4a1 1 0 001 1h14a1 1 0 001-1v-4"/>
+    </symbol>
+    <symbol id="i-database" viewBox="0 0 24 24">
+      <ellipse cx="12" cy="5.5" rx="7" ry="2.8"/>
+      <path d="M5 5.5v13c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-13"/>
+      <path d="M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="toast" id="toast"></div>
+
+<div class="app" id="app">
+  <div class="stage" id="stage">
+
+    <!-- 消息列表 -->
+    <section class="view active" id="viewChats">
+      <header class="navbar">
+        <div class="title">消息</div>
+        <div class="right">
+          <button class="nav-btn" id="btnChatSearch" type="button" aria-label="搜索">
+            <svg class="icon"><use href="#i-search"/></svg>
+          </button>
+          <button class="nav-btn" id="btnChatAdd" type="button" aria-label="添加联系人">
+            <svg class="icon"><use href="#i-plus"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="scroll" id="chatScroll">
+        <div id="searchBar" hidden style="padding:8px 12px;background:#ededed;">
+          <div style="display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;background:#fff;border-radius:6px;color:#b2b2b2;">
+            <svg class="icon sm"><use href="#i-search"/></svg>
+            <input type="text" id="searchInput" placeholder="搜索" autocomplete="off"
+              style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:inherit;font-size:16px;color:#191919;" />
+          </div>
+        </div>
+        <div id="chatList"></div>
+      </div>
+    </section>
+
+    <!-- 通讯录 -->
+    <section class="view" id="viewContacts">
+      <header class="navbar">
+        <div class="title">通讯录</div>
+        <div class="right">
+          <button class="nav-btn" id="btnAddContact" type="button" aria-label="添加联系人">
+            <svg class="icon"><use href="#i-add-friend"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="scroll">
+        <div class="group" style="margin-top:0;">
+          <button class="cell no-line no-avatar" type="button" id="cellNewFriend">
+            <span class="discover-icon" style="background:#fa9d3b;">
+              <svg class="icon"><use href="#i-add-friend"/></svg>
+            </span>
+            <span class="label">新的朋友</span>
+            <span class="value">2 条</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+          <button class="cell no-line no-avatar" type="button" id="cellGroupChat">
+            <span class="discover-icon" style="background:#07c160;">
+              <svg class="icon"><use href="#i-chat"/></svg>
+            </span>
+            <span class="label">群聊</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+        <div id="contactList"></div>
+      </div>
+    </section>
+
+    <!-- 发现 -->
+    <section class="view" id="viewDiscover">
+      <header class="navbar"><div class="title">发现</div></header>
+      <div class="scroll">
+        <div class="group" style="margin-top:0;">
+          <button class="cell no-line no-avatar" type="button" id="cellMoments">
+            <span class="discover-icon" style="background:#f2b23c;">
+              <svg class="icon"><use href="#i-moments"/></svg>
+            </span>
+            <span class="label">朋友圈</span>
+            <span class="value" id="momentsCount"></span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+        <div class="group">
+          <button class="cell no-line no-avatar" type="button" id="cellScan">
+            <span class="discover-icon" style="background:#3a7bd5;">
+              <svg class="icon"><use href="#i-scan"/></svg>
+            </span>
+            <span class="label">扫一扫</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+          <button class="cell no-line no-avatar" type="button" id="cellCards">
+            <span class="discover-icon" style="background:#5b8def;">
+              <svg class="icon"><use href="#i-card"/></svg>
+            </span>
+            <span class="label">字卡管理</span>
+            <span class="value" id="cardsCount"></span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+          <button class="cell no-line no-avatar" type="button" id="cellWall">
+            <span class="discover-icon" style="background:#8a7bf0;">
+              <svg class="icon"><use href="#i-wallpaper"/></svg>
+            </span>
+            <span class="label">聊天壁纸</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+          <button class="cell no-line no-avatar" type="button" id="cellBubble">
+            <span class="discover-icon" style="background:#2fb39b;">
+              <svg class="icon"><use href="#i-bubble"/></svg>
+            </span>
+            <span class="label">气泡样式</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 我 -->
+    <section class="view" id="viewMe">
+      <header class="navbar"><div class="title">我</div></header>
+      <div class="scroll">
+        <div class="profile-header" id="profileHeader">
+          <div class="avatar xl" id="myAvatar" style="background:#2f6bff;">我</div>
+          <div class="profile-info">
+            <div class="profile-name" id="myName">我的昵称</div>
+            <div class="profile-id" id="myId">微信号：wxid_100248</div>
+            <div class="profile-sign" id="mySign"></div>
+          </div>
+          <svg class="icon sm arrow" style="color:#b2b2b2;"><use href="#i-chevron"/></svg>
+        </div>
+        <div class="group">
+          <button class="cell no-avatar" type="button" id="cellMyCard">
+            <span class="discover-icon" style="background:#5b8def;">
+              <svg class="icon"><use href="#i-card"/></svg>
+            </span>
+            <span class="label">我的字卡</span>
+            <span class="value" id="myCardsCount"></span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+          <button class="cell no-avatar" type="button" id="cellMyQr">
+            <span class="discover-icon" style="background:#3a7bd5;">
+              <svg class="icon"><use href="#i-qr"/></svg>
+            </span>
+            <span class="label">我的二维码</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+        <div class="group">
+          <button class="cell no-line no-avatar" type="button" id="cellEditProfile">
+            <span class="discover-icon" style="background:#07c160;">
+              <svg class="icon"><use href="#i-edit"/></svg>
+            </span>
+            <span class="label">编辑资料</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+        <div class="group">
+          <button class="cell no-line no-avatar" type="button" id="cellSettings">
+            <span class="discover-icon" style="background:#8a8a8a;">
+              <svg class="icon"><use href="#i-settings"/></svg>
+            </span>
+            <span class="label">设置</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+        <div style="height:24px;"></div>
+      </div>
+    </section>
+
+    <!-- 聊天 -->
+    <section class="view slide" id="viewChat">
+      <header class="navbar chat-nav">
+        <div class="left">
+          <button class="nav-btn" id="btnBack" type="button" aria-label="返回">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <button class="chat-title-btn" id="btnChatContact" type="button">
+          <span class="name" id="chatName">—</span>
+          <svg class="icon"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="right">
+          <button class="nav-btn" type="button" aria-label="更多">
+            <svg class="icon"><use href="#i-more"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="scroll msg-scroll" id="messages"></div>
+      <div class="composer">
+        <button class="album-btn" id="btnAlbum" type="button" aria-label="发送相册图片">
+          <svg class="icon"><use href="#i-image"/></svg>
+        </button>
+        <input type="text" id="msgInput" placeholder="输入想说的话" autocomplete="off" enterkeyhint="send" />
+        <button class="send-btn" id="btnSend" type="button" disabled>发送</button>
+        <button class="card-btn" id="btnRandomCard" type="button" aria-label="让对方随机发字卡">
+          <svg class="icon"><use href="#i-magic"/></svg>
+        </button>
+      </div>
+      <input type="file" id="albumInput" accept="image/*" class="hidden-file" />
+    </section>
+
+    <!-- 联系人资料 -->
+    <section class="view slide" id="viewContactProfile">
+      <header class="navbar">
+        <div class="left">
+          <button class="nav-btn" id="btnProfileBack" type="button">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <div class="title">联系人资料</div>
+        <div class="right">
+          <button class="nav-btn" id="btnProfileEdit" type="button" style="font-size:15px;">编辑</button>
+        </div>
+      </header>
+      <div class="scroll">
+        <div class="profile-header" style="cursor:default;">
+          <div class="avatar xl" id="profileAvatar" style="background:#5b8def;">?</div>
+          <div class="profile-info">
+            <div class="profile-name" id="profileName">—</div>
+            <div class="profile-id" id="profileWechatId">—</div>
+            <div class="profile-sign" id="profileTag"></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="cell no-line" style="cursor:default;">
+            <span class="label" style="color:#888;flex:0 0 76px;">备注</span>
+            <span class="value" style="flex:1;text-align:right;" id="profileRemark">—</span>
+          </div>
+          <div class="cell no-line" style="cursor:default;">
+            <span class="label" style="color:#888;flex:0 0 76px;">标签</span>
+            <span class="value" style="flex:1;text-align:right;" id="profileTagValue">—</span>
+          </div>
+        </div>
+
+        <div class="group">
+          <div style="padding:14px 16px 6px;font-size:13px;color:#888;">当前聊天壁纸</div>
+          <div class="contact-wall-preview" id="contactWallPreview"></div>
+          <button class="cell no-line no-avatar" type="button" id="btnContactWallDefault">
+            <span class="discover-icon" style="background:#8a7bf0;">
+              <svg class="icon"><use href="#i-wallpaper"/></svg>
+            </span>
+            <span class="label">恢复默认壁纸</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+          <button class="cell no-line no-avatar" type="button" id="btnContactWallPick">
+            <span class="discover-icon" style="background:#3a7bd5;">
+              <svg class="icon"><use href="#i-image"/></svg>
+            </span>
+            <span class="label">从相册选择壁纸</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+          <div class="form-hint">为该联系人单独设置聊天背景，不影响其他聊天。</div>
+        </div>
+
+        <button class="btn-primary" id="btnProfileSendMsg" type="button">发消息</button>
+        <button class="btn-danger" id="btnProfileDelete" type="button">删除联系人</button>
+        <div style="height:24px;"></div>
+      </div>
+      <input type="file" id="contactWallInput" accept="image/*" class="hidden-file" />
+    </section>
+
+    <!-- 添加联系人 -->
+    <section class="view slide" id="viewAddContact">
+      <header class="navbar">
+        <div class="left">
+          <button class="nav-btn" data-back="viewContacts" type="button">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <div class="title">添加朋友</div>
+        <div class="right">
+          <button class="nav-btn" id="btnSubmitAdd" type="button" style="font-size:15px;">发送</button>
+        </div>
+      </header>
+      <div class="scroll">
+        <div class="avatar-picker" id="addAvatarPicker">
+          <div class="avatar xl" id="addAvatar" style="background:#5b8def;">?</div>
+          <div>
+            <div style="font-size:17px;">头像</div>
+            <div class="txt">点击从相册选择，长按更换颜色</div>
+          </div>
+          <svg class="icon sm arrow" style="color:#b2b2b2;margin-left:auto;"><use href="#i-chevron"/></svg>
+        </div>
+        <input type="file" id="addAvatarInput" accept="image/*" class="hidden-file" />
+
+        <div class="form-group">
+          <div class="form-row">
+            <span class="label">昵称</span>
+            <input type="text" id="addName" placeholder="请输入对方昵称" autocomplete="off" />
+          </div>
+          <div class="form-row">
+            <span class="label">微信号</span>
+            <input type="text" id="addWechatId" placeholder="请输入微信号" autocomplete="off" />
+          </div>
+          <div class="form-row">
+            <span class="label">备注</span>
+            <input type="text" id="addRemark" placeholder="选填" autocomplete="off" />
+          </div>
+          <div class="form-row">
+            <span class="label">标签</span>
+            <input type="text" id="addTag" placeholder="选填，如：同事、家人" autocomplete="off" />
+          </div>
+        </div>
+        <div class="form-hint">添加后，联系人会出现在通讯录中。</div>
+      </div>
+    </section>
+
+    <!-- 编辑联系人 -->
+    <section class="view slide" id="viewEditContact">
+      <header class="navbar">
+        <div class="left">
+          <button class="nav-btn" id="btnEditContactBack" type="button">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <div class="title">编辑联系人</div>
+        <div class="right">
+          <button class="nav-btn" id="btnSaveContact" type="button" style="font-size:15px;">完成</button>
+        </div>
+      </header>
+      <div class="scroll">
+        <div class="avatar-picker" id="contactAvatarPicker">
+          <div class="avatar xl" id="editContactAvatar" style="background:#5b8def;">?</div>
+          <div>
+            <div style="font-size:17px;">头像</div>
+            <div class="txt">点击从相册选择，长按更换颜色</div>
+          </div>
+          <svg class="icon sm arrow" style="color:#b2b2b2;margin-left:auto;"><use href="#i-chevron"/></svg>
+        </div>
+        <input type="file" id="contactAvatarInput" accept="image/*" class="hidden-file" />
+
+        <div class="form-group">
+          <div class="form-row">
+            <span class="label">昵称</span>
+            <input type="text" id="editContactName" placeholder="请输入昵称" autocomplete="off" />
+          </div>
+          <div class="form-row">
+            <span class="label">微信号</span>
+            <input type="text" id="editContactWechatId" placeholder="请输入微信号" autocomplete="off" />
+          </div>
+          <div class="form-row">
+            <span class="label">备注</span>
+            <input type="text" id="editContactRemark" placeholder="选填" autocomplete="off" />
+          </div>
+          <div class="form-row">
+            <span class="label">标签</span>
+            <input type="text" id="editContactTag" placeholder="选填，如：同事、家人" autocomplete="off" />
+          </div>
+        </div>
+        <div class="form-hint">修改后，联系人信息会同步更新。</div>
+        <button class="btn-danger" id="btnDeleteContact" type="button">删除联系人</button>
+      </div>
+    </section>
+
+    <!-- 设置 -->
+    <section class="view slide" id="viewSettings">
+      <header class="navbar">
+        <div class="left">
+          <button class="nav-btn" data-back="viewMe" type="button">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <div class="title">设置</div>
+      </header>
+      <div class="scroll">
+        <!-- 字卡发送速度 -->
+        <div class="group" style="margin-top:0;">
+          <div style="padding:14px 16px 8px;display:flex;align-items:center;gap:8px;">
+            <span class="discover-icon" style="background:#5b8def;">
+              <svg class="icon"><use href="#i-timer"/></svg>
+            </span>
+            <span style="font-size:15px;font-weight:600;">字卡发送速度</span>
+          </div>
+          <div class="speed-slider-wrap">
+            <div class="slider-label">
+              <span>慢</span>
+              <span id="speedLabel">1.2 秒</span>
+              <span>快</span>
+            </div>
+            <input type="range" class="speed-slider" id="speedSlider" min="300" max="3000" step="100" value="1200" />
+          </div>
+          <div class="speed-options" id="speedOptions">
+            <button class="speed-opt" type="button" data-speed="400">
+              <span>很快（0.4 秒）</span>
+              <svg class="icon opt-check"><use href="#i-check"/></svg>
+            </button>
+            <button class="speed-opt" type="button" data-speed="800">
+              <span>较快（0.8 秒）</span>
+              <svg class="icon opt-check"><use href="#i-check"/></svg>
+            </button>
+            <button class="speed-opt" type="button" data-speed="1200">
+              <span>标准（1.2 秒）</span>
+              <svg class="icon opt-check"><use href="#i-check"/></svg>
+            </button>
+            <button class="speed-opt" type="button" data-speed="2000">
+              <span>较慢（2.0 秒）</span>
+              <svg class="icon opt-check"><use href="#i-check"/></svg>
+            </button>
+            <button class="speed-opt" type="button" data-speed="3000">
+              <span>很慢（3.0 秒）</span>
+              <svg class="icon opt-check"><use href="#i-check"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="form-hint">调整联系人发送随机字卡时的等待时间。</div>
+
+        <!-- 数据管理 -->
+        <div class="group">
+          <div style="padding:14px 16px 8px;display:flex;align-items:center;gap:8px;">
+            <span class="discover-icon" style="background:#07c160;">
+              <svg class="icon"><use href="#i-database"/></svg>
+            </span>
+            <span style="font-size:15px;font-weight:600;">数据管理</span>
+          </div>
+
+          <div class="data-stats" id="dataStats">
+            <div class="data-stat">
+              <div class="num" id="statContacts">0</div>
+              <div class="lbl">联系人</div>
+            </div>
+            <div class="data-stat">
+              <div class="num" id="statMessages">0</div>
+              <div class="lbl">聊天消息</div>
+            </div>
+            <div class="data-stat">
+              <div class="num" id="statCards">0</div>
+              <div class="lbl">字卡</div>
+            </div>
+            <div class="data-stat">
+              <div class="num" id="statMoments">0</div>
+              <div class="lbl">朋友圈</div>
+            </div>
+          </div>
+
+          <button class="cell no-line no-avatar" type="button" id="btnExportData">
+            <span class="discover-icon" style="background:#3a7bd5;">
+              <svg class="icon"><use href="#i-export"/></svg>
+            </span>
+            <span class="label">导出数据</span>
+            <span class="value">JSON 文件</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+
+          <button class="cell no-line no-avatar" type="button" id="btnImportData">
+            <span class="discover-icon" style="background:#fa9d3b;">
+              <svg class="icon"><use href="#i-import"/></svg>
+            </span>
+            <span class="label">导入数据</span>
+            <span class="value">从文件恢复</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+
+          <button class="cell no-line no-avatar" type="button" id="btnResetData">
+            <span class="discover-icon" style="background:#fa5151;">
+              <svg class="icon"><use href="#i-trash"/></svg>
+            </span>
+            <span class="label" style="color:var(--danger);">清空所有数据</span>
+            <svg class="icon sm arrow"><use href="#i-chevron"/></svg>
+          </button>
+
+          <div class="form-hint">
+            导出会把联系人、聊天记录、字卡、朋友圈和资料保存为 JSON 文件；导入会覆盖当前数据，请谨慎操作。
+          </div>
+        </div>
+        <div style="height:24px;"></div>
+      </div>
+      <input type="file" id="importInput" accept="application/json,.json" class="hidden-file" />
+    </section>
+
+    <!-- 朋友圈 -->
+    <section class="view slide" id="viewMoments">
+      <header class="navbar">
+        <div class="left">
+          <button class="nav-btn" data-back="viewDiscover" type="button">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <div class="title">朋友圈</div>
+        <div class="right">
+          <button class="nav-btn" id="btnNewMoment" type="button" aria-label="发布">
+            <svg class="icon"><use href="#i-camera"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="scroll" id="momentList"></div>
+    </section>
+
+    <!-- 发布朋友圈 -->
+    <section class="view slide" id="viewNewMoment">
+      <header class="navbar">
+        <div class="left">
+          <button class="nav-btn" data-back="viewMoments" type="button">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <div class="title">发表动态</div>
+        <div class="right">
+          <button class="nav-btn" id="btnPublishMoment" type="button" style="font-size:15px;">发表</button>
+        </div>
+      </header>
+      <div class="scroll">
+        <div class="moment-pub">
+          <textarea id="momentText" placeholder="这一刻的想法..."></textarea>
+          <div class="moment-pub-imgs" id="momentThumbs"></div>
+          <div class="moment-tools">
+            <button class="tool" id="btnPickMomentImg" type="button">
+              <svg class="icon"><use href="#i-image"/></svg>
+              添加图片
+            </button>
+            <button class="pub-btn" id="btnPublishMoment2" type="button">发表</button>
+          </div>
+        </div>
+        <div class="form-hint">支持文字和图片，最多可添加 9 张图片。</div>
+      </div>
+      <input type="file" id="momentImgInput" accept="image/*" multiple class="hidden-file" />
+    </section>
+
+    <!-- 字卡管理 -->
+    <section class="view slide" id="viewCards">
+      <header class="navbar">
+        <div class="left">
+          <button class="nav-btn" data-back="viewDiscover" type="button">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <div class="title">字卡管理</div>
+        <div class="right">
+          <button class="nav-btn" id="btnClearCards" type="button" style="font-size:15px;">清空</button>
+        </div>
+      </header>
+      <div class="scroll">
+        <div class="card-input-area">
+          <textarea id="cardBatchInput" placeholder="每行一张字卡，格式：标题 | 内容&#10;例如：&#10;项目排期 | 周一评审，周三初稿&#10;待办清单 | 整理会议纪要&#10;灵感记录 | 想到一个好点子"></textarea>
+        </div>
+        <div class="card-actions">
+          <span class="hint">每行一张，回车换行</span>
+          <button class="card-add-btn" id="btnBatchAddCard" type="button">
+            <svg class="icon"><use href="#i-plus"/></svg>
+            添加
+          </button>
+        </div>
+        <div class="group" style="margin-top:10px;">
+          <div style="padding:12px 16px 6px;font-size:13px;color:#888;">已保存字卡</div>
+          <div id="cardList"></div>
+        </div>
+        <div style="height:24px;"></div>
+      </div>
+    </section>
+
+    <!-- 编辑资料 -->
+    <section class="view slide" id="viewEditProfile">
+      <header class="navbar">
+        <div class="left">
+          <button class="nav-btn" data-back="viewMe" type="button">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <div class="title">编辑资料</div>
+        <div class="right">
+          <button class="nav-btn" id="btnSaveProfile" type="button" style="font-size:15px;">完成</button>
+        </div>
+      </header>
+      <div class="scroll">
+        <div class="avatar-picker" id="avatarPicker">
+          <div class="avatar xl" id="editAvatar" style="background:#2f6bff;">我</div>
+          <div>
+            <div style="font-size:17px;">头像</div>
+            <div class="txt">点击从相册选择，长按更换颜色</div>
+          </div>
+          <svg class="icon sm arrow" style="color:#b2b2b2;margin-left:auto;"><use href="#i-chevron"/></svg>
+        </div>
+        <input type="file" id="myAvatarInput" accept="image/*" class="hidden-file" />
+
+        <div class="form-group">
+          <div class="form-row">
+            <span class="label">昵称</span>
+            <input type="text" id="editName" placeholder="请输入昵称" autocomplete="off" />
+          </div>
+          <div class="form-row">
+            <span class="label">微信号</span>
+            <input type="text" id="editWechatId" placeholder="请输入微信号" autocomplete="off" />
+          </div>
+          <div class="form-row">
+            <span class="label">个性签名</span>
+            <input type="text" id="editSign" placeholder="选填" autocomplete="off" />
+          </div>
+          <div class="form-row">
+            <span class="label">性别</span>
+            <select id="editGender">
+              <option value="保密">保密</option>
+              <option value="男">男</option>
+              <option value="女">女</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="form-row">
+            <span class="label">地区</span>
+            <input type="text" id="editRegion" placeholder="选填，如：广西 钦州" autocomplete="off" />
+          </div>
+        </div>
+        <div class="form-hint">完善资料，让朋友更容易找到你。</div>
+      </div>
+    </section>
+
+    <!-- 聊天壁纸 -->
+    <section class="view slide" id="viewWallpaper">
+      <header class="navbar">
+        <div class="left">
+          <button class="nav-btn" data-back="viewDiscover" type="button">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <div class="title">聊天壁纸</div>
+      </header>
+      <div class="scroll">
+        <div class="group" style="margin-top:0;">
+          <div style="padding:12px 16px 6px;font-size:13px;color:#888;">全局壁纸</div>
+          <div class="wall-grid" id="wallGrid"></div>
+        </div>
+        <button class="wall-pick" id="btnPickWall" type="button">
+          <svg class="icon"><use href="#i-image"/></svg>
+          从相册选择壁纸
+        </button>
+        <div class="form-hint">这里设置全局壁纸；如需为单个联系人单独设置，请进入该联系人的资料页。</div>
+      </div>
+      <input type="file" id="wallInput" accept="image/*" class="hidden-file" />
+    </section>
+
+    <!-- 气泡样式 -->
+    <section class="view slide" id="viewBubble">
+      <header class="navbar">
+        <div class="left">
+          <button class="nav-btn" data-back="viewDiscover" type="button">
+            <svg class="icon"><use href="#i-back"/></svg>
+          </button>
+        </div>
+        <div class="title">气泡样式</div>
+      </header>
+      <div class="scroll">
+        <div class="group" style="margin-top:0;">
+          <div style="padding:12px 16px 6px;font-size:13px;color:#888;">选择气泡配色</div>
+          <div class="bubble-grid" id="bubbleGrid"></div>
+        </div>
+        <div class="form-hint">气泡样式会应用到所有聊天窗口。</div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- 底部导航 -->
+  <nav class="tabbar" id="tabbar">
+    <button class="tab active" type="button" data-view="viewChats">
+      <svg class="icon"><use href="#i-chat"/></svg>
+      <span>消息</span>
+      <span class="dot" id="tabChatDot">3</span>
+    </button>
+    <button class="tab" type="button" data-view="viewContacts">
+      <svg class="icon"><use href="#i-contacts"/></svg>
+      <span>通讯录</span>
+      <span class="dot" id="tabContactDot">2</span>
+    </button>
+    <button class="tab" type="button" data-view="viewDiscover">
+      <svg class="icon"><use href="#i-discover"/></svg>
+      <span>发现</span>
+    </button>
+    <button class="tab" type="button" data-view="viewMe">
+      <svg class="icon"><use href="#i-me"/></svg>
+      <span>我</span>
+    </button>
+  </nav>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ========== 视口高度 ========== */
+  var rootStyle = document.documentElement.style;
+  function syncHeight() {
+    var vv = window.visualViewport;
+    var h = (vv && vv.height) ? vv.height : window.innerHeight;
+    if (h) rootStyle.setProperty('--app-h', h + 'px');
+  }
+  syncHeight();
+  window.addEventListener('resize', syncHeight);
+  window.addEventListener('orientationchange', function () { setTimeout(syncHeight, 120); });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncHeight);
+    window.visualViewport.addEventListener('scroll', syncHeight);
+  }
+
+  /* ========== 工具 ========== */
+  function $(sel) { return document.querySelector(sel); }
+  function $all(sel) { return document.querySelectorAll(sel); }
+  function esc(str) {
+    return String(str).replace(/[&<>"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+  function initialOf(name) {
+    var s = String(name || '').trim();
+    return s ? s.charAt(0) : '?';
+  }
+  function nowTime() {
+    var d = new Date();
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  function nowDate() {
+    var d = new Date();
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + nowTime();
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $('#toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 1600);
+  }
+  var AVATAR_COLORS = ['#2f6bff', '#07c160', '#fa9d3b', '#e8698e', '#8a7bf0', '#2fb39b', '#4a90d9', '#d96b6b'];
+
+  /* ========== 数据 ========== */
+  var people = [
+    { id: 'p1', name: '林晓',     color: '#5b8def', avatar: null, wechatId: 'linxiao_88',  status: '在线',       letter: 'L', remark: '', tag: '', wall: null },
+    { id: 'p2', name: '陈默',     color: '#2fb39b', avatar: null, wechatId: 'chenmo_2024', status: '2 小时前在线', letter: 'C', remark: '', tag: '', wall: null },
+    { id: 'p3', name: '设计小组', color: '#f2994a', avatar: null, wechatId: 'design_group',status: '5 人',       letter: 'S', remark: '', tag: '工作', wall: null },
+    { id: 'p4', name: '苏雨',     color: '#e8698e', avatar: null, wechatId: 'suyu_rain',   status: '在线',       letter: 'S', remark: '', tag: '', wall: null },
+    { id: 'p5', name: '张宇',     color: '#8a7bf0', avatar: null, wechatId: 'zhangyu_9',   status: '昨天在线',   letter: 'Z', remark: '', tag: '', wall: null }
+  ];
+
+  var chats = {
+    p1: { unread: 2, messages: [
+      { me: false, text: '周末那个方案改好了吗？', time: '09:12' },
+      { me: true,  text: '改好了，稍后发你。', time: '09:20' },
+      { me: false, text: '顺便把主色再调亮一点', time: '09:21' }
+    ]},
+    p2: { unread: 0, messages: [
+      { me: false, text: '文档我放到共享盘了', time: '昨天' },
+      { me: true,  text: '收到，我看看', time: '昨天' }
+    ]},
+    p3: { unread: 1, messages: [
+      { me: false, text: '新的切图已经上传', time: '昨天' },
+      { me: false, text: '记得同步给前端', time: '昨天' }
+    ]},
+    p4: { unread: 0, messages: [
+      { me: true, text: '下午三点会议室见', time: '周一' }
+    ]},
+    p5: { unread: 0, messages: [] }
+  };
+
+  var myProfile = { name: '我的昵称', wechatId: 'wxid_100248', sign: '', gender: '保密', region: '', color: '#2f6bff', avatar: null };
+
+  var cards = [
+    { id: 'c1', title: '项目排期', content: '周一评审，周三初稿，周五交付。', tag: '工作' },
+    { id: 'c2', title: '待办清单', content: '整理会议纪要\n回复客户邮件\n更新设计稿', tag: '生活' },
+    { id: 'c3', title: '灵感记录', content: '做一个纯字卡的聊天工具，支持图片和随机回复。', tag: '灵感' }
+  ];
+
+  var moments = [
+    { id: 'm1', author: '林晓', color: '#5b8def', avatar: null, text: '今天天气不错，出门走了走。', images: [], time: '10分钟前' },
+    { id: 'm2', author: '陈默', color: '#2fb39b', avatar: null, text: '新版本终于发布了，感谢团队！', images: [], time: '2小时前' }
+  ];
+
+  var WALLS = [
+    { id: 'w1', name: '默认', value: '#ededed' },
+    { id: 'w2', name: '浅灰', value: '#f2f2f2' },
+    { id: 'w3', name: '暖白', value: '#faf6ef' },
+    { id: 'w4', name: '淡蓝', value: '#eef3fb' },
+    { id: 'w5', name: '淡绿', value: '#eef7f0' },
+    { id: 'w6', name: '淡粉', value: '#fbf0f2' },
+    { id: 'w7', name: '深色', value: '#2b2b2b' },
+    { id: 'w8', name: '夜晚蓝', value: '#1f2a44' }
+  ];
+
+  var BUBBLES = [
+    { id: 'b1', name: '经典绿', me: '#95ec69', you: '#ffffff', meText: '#191919', youText: '#191919', radius: '6px', tail: true },
+    { id: 'b2', name: '简约蓝', me: '#3a7bd5', you: '#ffffff', meText: '#ffffff', youText: '#191919', radius: '6px', tail: true },
+    { id: 'b3', name: '柔和蓝', me: '#5b8def', you: '#eef3fb', meText: '#ffffff', youText: '#191919', radius: '14px', tail: false },
+    { id: 'b4', name: '暖橙', me: '#fa9d3b', you: '#fdf0e2', meText: '#ffffff', youText: '#191919', radius: '14px', tail: false },
+    { id: 'b5', name: '深色', me: '#2fb39b', you: '#3a3a3a', meText: '#ffffff', youText: '#f0f0f0', radius: '10px', tail: true },
+    { id: 'b6', name: '圆润紫', me: '#8a7bf0', you: '#ffffff', meText: '#ffffff', youText: '#191919', radius: '18px', tail: false }
+  ];
+
+  var currentWall = WALLS[0];
+  var currentBubble = BUBBLES[0];
+  var globalWallImage = null;
+
+  var cardSpeed = 1200;
+
+  var currentId = null;
+  var editingContactId = null;
+  var profileContactId = null;
+  var newAvatarData = null;
+  var editContactAvatarData = null;
+  var momentImages = [];
+  var replyTimer = null;
+
+  function personById(id) {
+    for (var i = 0; i < people.length; i++) if (people[i].id === id) return people[i];
+    return null;
+  }
+  function displayName(p) { return p.remark || p.name; }
+
+  /* ========== 视图切换 ========== */
+  var MAIN_VIEWS = ['viewChats', 'viewContacts', 'viewDiscover', 'viewMe'];
+
+  function showView(id) {
+    var views = $all('.view');
+    for (var i = 0; i < views.length; i++) {
+      views[i].classList.toggle('active', views[i].id === id);
+    }
+    var isChat = (id === 'viewChat');
+    $('#app').classList.toggle('chat-open', isChat);
+
+    var tabs = $all('.tab');
+    for (var j = 0; j < tabs.length; j++) {
+      var v = tabs[j].dataset.view;
+      var active = (v === id);
+      if (MAIN_VIEWS.indexOf(id) === -1) {
+        if ((id === 'viewEditProfile' || id === 'viewSettings') && v === 'viewMe') active = true;
+        else if ((id === 'viewAddContact' || id === 'viewEditContact') && v === 'viewContacts') active = true;
+        else if ((id === 'viewCards' || id === 'viewWallpaper' || id === 'viewBubble' || id === 'viewMoments' || id === 'viewNewMoment') && v === 'viewDiscover') active = true;
+        else if (id === 'viewContactProfile' && v === 'viewChats') active = true;
+      }
+      tabs[j].classList.toggle('active', active);
+    }
+  }
+
+  /* ========== 壁纸与气泡 ========== */
+  function wallValueFor(contactId) {
+    var p = contactId ? personById(contactId) : null;
+    if (p && p.wall) return 'url(' + p.wall + ')';
+    if (globalWallImage) return 'url(' + globalWallImage + ')';
+    return currentWall.value;
+  }
+
+  function applyWall(contactId) {
+    var val = wallValueFor(contactId);
+    rootStyle.setProperty('--chat-wall', val);
+
+    var nav = document.querySelector('.chat-nav');
+    if (nav) {
+      var isDark = false;
+      var p = contactId ? personById(contactId) : null;
+      if (!(p && p.wall) && !globalWallImage) {
+        isDark = (currentWall.value === '#2b2b2b' || currentWall.value === '#1f2a44');
+      }
+      nav.style.background = isDark ? '#232323' : '#ededed';
+      nav.style.borderBottomColor = isDark ? '#333' : '#dcdcdc';
+      var btn = nav.querySelector('.chat-title-btn');
+      var nameEl = nav.querySelector('.chat-title-btn .name');
+      var btns = nav.querySelectorAll('.nav-btn');
+      if (btn) btn.style.color = isDark ? '#f0f0f0' : '#191919';
+      if (nameEl) nameEl.style.color = isDark ? '#f0f0f0' : '#191919';
+      for (var i = 0; i < btns.length; i++) btns[i].style.color = isDark ? '#f0f0f0' : '#191919';
+    }
+  }
+
+  function applyBubble() {
+    rootStyle.setProperty('--bubble-me', currentBubble.me);
+    rootStyle.setProperty('--bubble-you', currentBubble.you);
+    rootStyle.setProperty('--bubble-me-text', currentBubble.meText);
+    rootStyle.setProperty('--bubble-you-text', currentBubble.youText);
+    rootStyle.setProperty('--bubble-radius', currentBubble.radius);
+    $('#viewChat').classList.toggle('no-tail', !currentBubble.tail);
+  }
+
+  /* ========== 头像渲染 ========== */
+  function avatarHTML(p, extraClass) {
+    var cls = 'avatar' + (extraClass ? ' ' + extraClass : '');
+    if (p.avatar) {
+      return '<span class="' + cls + '" style="background:' + p.color + '">' +
+        '<img src="' + p.avatar + '" alt="" />' +
+      '</span>';
+    }
+    return '<span class="' + cls + '" style="background:' + p.color + '">' +
+      esc(initialOf(displayName(p) || p.name)) +
+    '</span>';
+  }
+
+  /* ========== 消息列表 ========== */
+  function currentFilter() {
+    var input = $('#searchInput');
+    return input && !$('#searchBar').hidden ? input.value.trim() : '';
+  }
+
+  function renderChatList(filter) {
+    filter = filter || '';
+    var list = $('#chatList');
+    var html = '';
+    var shown = 0;
+
+    people.forEach(function (p) {
+      var name = displayName(p);
+      if (filter && name.indexOf(filter) === -1) return;
+      var c = chats[p.id];
+      if (!c) return;
+      var last = c.messages[c.messages.length - 1];
+      var preview = '开始新的对话';
+      if (last) {
+        if (last.type === 'image') preview = (last.me ? '我：' : '') + '[图片]';
+        else if (last.type === 'card') preview = (last.me ? '我：' : '') + '[字卡] ' + (last.card.title || '');
+        else preview = (last.me ? '我：' : '') + last.text;
+      }
+      var time = last ? last.time : '';
+
+      html +=
+        '<button class="conv" type="button" data-id="' + p.id + '">' +
+          avatarHTML(p) +
+          '<span class="conv-main">' +
+            '<span class="conv-row">' +
+              '<span class="conv-name">' + esc(name) + '</span>' +
+              '<span class="conv-time">' + esc(time) + '</span>' +
+            '</span>' +
+            '<span class="conv-row">' +
+              '<span class="conv-preview">' + esc(preview) + '</span>' +
+              (c.unread > 0 ? '<span class="badge">' + c.unread + '</span>' : '') +
+            '</span>' +
+          '</span>' +
+        '</button>';
+      shown++;
+    });
+
+    if (shown === 0) {
+      html = '<div class="empty-tip">暂无会话</div>';
+    }
+    list.innerHTML = html;
+    updateTabDots();
+  }
+
+  $('#chatList').addEventListener('click', function (e) {
+    var btn = e.target.closest('.conv');
+    if (btn) openChat(btn.dataset.id);
+  });
+
+  function totalUnread() {
+    var n = 0;
+    for (var k in chats) if (chats.hasOwnProperty(k)) n += chats[k].unread || 0;
+    return n;
+  }
+
+  function updateTabDots() {
+    var n = totalUnread();
+    var dot = $('#tabChatDot');
+    if (n > 0) { dot.textContent = n > 99 ? '99+' : n; dot.hidden = false; }
+    else dot.hidden = true;
+    $('#tabContactDot').hidden = false;
+  }
+
+  /* ========== 通讯录 ========== */
+  function renderContacts() {
+    var box = $('#contactList');
+    var groups = {};
+    people.forEach(function (p) {
+      var L = (p.letter || '#').toUpperCase();
+      if (!groups[L]) groups[L] = [];
+      groups[L].push(p);
+    });
+    var letters = Object.keys(groups).sort();
+
+    var html = '';
+    letters.forEach(function (L) {
+      html += '<div class="index-letter">' + esc(L) + '</div>';
+      groups[L].forEach(function (p) {
+        var name = displayName(p);
+        html +=
+          '<button class="cell" type="button" data-id="' + p.id + '">' +
+            avatarHTML(p) +
+            '<span class="label">' + esc(name) + '</span>' +
+            (p.tag ? '<span class="value">' + esc(p.tag) + '</span>' : '') +
+          '</button>';
+      });
+    });
+
+    if (letters.length === 0) {
+      html = '<div class="empty-tip">暂无联系人</div>';
+    }
+    box.innerHTML = html;
+  }
+
+  $('#contactList').addEventListener('click', function (e) {
+    var btn = e.target.closest('.cell[data-id]');
+    if (btn) openChat(btn.dataset.id);
+  });
+
+  var contactPressTimer = null;
+  $('#contactList').addEventListener('touchstart', function (e) {
+    var btn = e.target.closest('.cell[data-id]');
+    if (!btn) return;
+    contactPressTimer = setTimeout(function () { openEditContact(btn.dataset.id); }, 550);
+  });
+  $('#contactList').addEventListener('touchend', function () { clearTimeout(contactPressTimer); });
+  $('#contactList').addEventListener('touchmove', function () { clearTimeout(contactPressTimer); });
+  $('#contactList').addEventListener('dblclick', function (e) {
+    var btn = e.target.closest('.cell[data-id]');
+    if (btn) openEditContact(btn.dataset.id);
+  });
+
+  /* ========== 聊天 ========== */
+  function renderMessages() {
+    var box = $('#messages');
+    if (!currentId) { box.innerHTML = ''; return; }
+    var p = personById(currentId);
+    var c = chats[currentId];
+    if (!c || !p) { box.innerHTML = ''; return; }
+    var html = '';
+    c.messages.forEach(function (m) {
+      var inner = '';
+      if (m.type === 'image') {
+        inner = '<img src="' + m.image + '" alt="图片" />';
+      } else if (m.type === 'card') {
+        inner =
+          '<div class="card-title">' + esc(m.card.title) + '</div>' +
+          (m.card.content ? '<div class="card-content">' + esc(m.card.content) + '</div>' : '') +
+          (m.card.tag ? '<span class="card-tag">' + esc(m.card.tag) + '</span>' : '');
+      } else {
+        inner = esc(m.text);
+      }
+
+      if (m.me) {
+        var myAv = myProfile.avatar
+          ? '<span class="avatar" style="background:' + myProfile.color + '"><img src="' + myProfile.avatar + '" alt="" /></span>'
+          : '<span class="avatar" style="background:' + myProfile.color + '">' + esc(initialOf(myProfile.name)) + '</span>';
+        html +=
+          '<div class="msg-row me">' +
+            myAv +
+            '<div><div class="bubble">' + inner + '</div><div class="stamp">' + esc(m.time) + '</div></div>' +
+          '</div>';
+      } else {
+        html +=
+          '<div class="msg-row">' +
+            avatarHTML(p) +
+            '<div><div class="bubble">' + inner + '</div><div class="stamp">' + esc(m.time) + '</div></div>' +
+          '</div>';
+      }
+    });
+    box.innerHTML = html;
+  }
+
+  function scrollBottom() {
+    var box = $('#messages');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function openChat(id) {
+    var p = personById(id);
+    if (!p) return;
+    if (!chats[id]) chats[id] = { unread: 0, messages: [] };
+
+    currentId = id;
+    chats[id].unread = 0;
+    $('#chatName').textContent = displayName(p);
+
+    applyWall(id);
+    renderMessages();
+    showView('viewChat');
+    $('#msgInput').value = '';
+    updateSendState();
+    requestAnimationFrame(function () { scrollBottom(); });
+    renderChatList(currentFilter());
+    updateTabDots();
+  }
+
+  function closeChat() {
+    currentId = null;
+    clearTimeout(replyTimer);
+    applyWall(null);
+    renderChatList(currentFilter());
+    showView('viewChats');
+  }
+
+  function updateSendState() {
+    $('#btnSend').disabled = $('#msgInput').value.trim().length === 0;
+  }
+
+  function sendMessage() {
+    if (!currentId) return;
+    var input = $('#msgInput');
+    var text = input.value.trim();
+    if (!text) return;
+
+    var c = chats[currentId];
+    c.messages.push({ me: true, text: text, time: nowTime(), type: 'text' });
+    input.value = '';
+    updateSendState();
+
+    renderMessages();
+    scrollBottom();
+    renderChatList(currentFilter());
+  }
+
+  /* ========== 相册上传（聊天） ========== */
+  $('#btnAlbum').addEventListener('click', function () {
+    if (!currentId) { toast('请先进入聊天'); return; }
+    $('#albumInput').click();
+  });
+
+  $('#albumInput').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file || !currentId) { this.value = ''; return; }
+
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var c = chats[currentId];
+      c.messages.push({ me: true, type: 'image', image: ev.target.result, time: nowTime() });
+      renderMessages();
+      scrollBottom();
+      renderChatList(currentFilter());
+    };
+    reader.readAsDataURL(file);
+    this.value = '';
+  });
+
+  /* ========== 随机字卡：由联系人发送 ========== */
+  $('#btnRandomCard').addEventListener('click', function () {
+    if (!currentId) return;
+    if (!cards.length) { toast('暂无字卡，请先在字卡管理中添加'); return; }
+    if (document.getElementById('typingRow')) return;
+
+    var chatId = currentId;
+    var p = personById(chatId);
+    var box = $('#messages');
+
+    var row = document.createElement('div');
+    row.className = 'msg-row';
+    row.id = 'typingRow';
+    row.innerHTML =
+      avatarHTML(p) +
+      '<div class="typing"><i></i><i></i><i></i></div>';
+    box.appendChild(row);
+    scrollBottom();
+
+    clearTimeout(replyTimer);
+    replyTimer = setTimeout(function () {
+      var typing = document.getElementById('typingRow');
+      if (typing) typing.parentNode.removeChild(typing);
+
+      var c = chats[chatId];
+      if (!c) return;
+      var pick = cards[Math.floor(Math.random() * cards.length)];
+      c.messages.push({
+        me: false,
+        type: 'card',
+        card: { title: pick.title, content: pick.content, tag: pick.tag },
+        time: nowTime()
+      });
+
+      if (currentId === chatId) {
+        renderMessages();
+        scrollBottom();
+      }
+      renderChatList(currentFilter());
+    }, cardSpeed);
+
+    toast('对方正在输入...');
+  });
+
+  /* ========== 聊天顶栏联系人入口 ========== */
+  $('#btnChatContact').addEventListener('click', function () {
+    if (!currentId) return;
+    openContactProfile(currentId);
+  });
+
+  /* ========== 联系人资料页 ========== */
+  function refreshContactWallPreview() {
+    var p = personById(profileContactId);
+    var el = $('#contactWallPreview');
+    if (!p || !el) return;
+    if (p.wall) {
+      el.style.backgroundImage = 'url(' + p.wall + ')';
+      el.style.backgroundColor = '';
+    } else {
+      el.style.backgroundImage = globalWallImage ? 'url(' + globalWallImage + ')' : '';
+      el.style.backgroundColor = globalWallImage ? 'transparent' : currentWall.value;
+    }
+  }
+
+  function openContactProfile(id) {
+    var p = personById(id);
+    if (!p) return;
+    profileContactId = id;
+
+    var av = $('#profileAvatar');
+    if (p.avatar) av.innerHTML = '<img src="' + p.avatar + '" alt="" />';
+    else av.textContent = initialOf(displayName(p));
+    av.style.background = p.color;
+
+    $('#profileName').textContent = displayName(p);
+    $('#profileWechatId').textContent = '微信号：' + (p.wechatId || '未设置');
+    var tagEl = $('#profileTag');
+    tagEl.textContent = p.status || '';
+    tagEl.hidden = !p.status;
+
+    $('#profileRemark').textContent = p.remark || '无';
+    $('#profileTagValue').textContent = p.tag || '无';
+
+    refreshContactWallPreview();
+    showView('viewContactProfile');
+  }
+
+  $('#btnProfileBack').addEventListener('click', function () {
+    if (currentId) showView('viewChat');
+    else showView('viewChats');
+  });
+
+  $('#btnProfileSendMsg').addEventListener('click', function () {
+    if (profileContactId) openChat(profileContactId);
+  });
+
+  $('#btnProfileEdit').addEventListener('click', function () {
+    if (profileContactId) openEditContact(profileContactId);
+  });
+
+  $('#btnProfileDelete').addEventListener('click', function () {
+    if (!profileContactId) return;
+    var p = personById(profileContactId);
+    if (!p) return;
+    if (!confirm('确定删除联系人「' + displayName(p) + '」吗？')) return;
+
+    var deletedId = profileContactId;
+    people = people.filter(function (x) { return x.id !== deletedId; });
+    delete chats[deletedId];
+    if (currentId === deletedId) currentId = null;
+    profileContactId = null;
+    editingContactId = null;
+
+    renderContacts();
+    renderChatList(currentFilter());
+    updateTabDots();
+    updateDataStats();
+    toast('联系人已删除');
+    showView('viewContacts');
+  });
+
+  $('#btnContactWallPick').addEventListener('click', function () {
+    if (!profileContactId) return;
+    $('#contactWallInput').click();
+  });
+
+  $('#contactWallInput').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file || !profileContactId) { this.value = ''; return; }
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var p = personById(profileContactId);
+      if (!p) return;
+      p.wall = ev.target.result;
+      refreshContactWallPreview();
+      if (currentId === profileContactId) applyWall(profileContactId);
+      toast('已为该聊天设置壁纸');
+    };
+    reader.readAsDataURL(file);
+    this.value = '';
+  });
+
+  $('#btnContactWallDefault').addEventListener('click', function () {
+    var p = personById(profileContactId);
+    if (!p) return;
+    p.wall = null;
+    refreshContactWallPreview();
+    if (currentId === profileContactId) applyWall(profileContactId);
+    toast('已恢复默认壁纸');
+  });
+
+  /* ========== 搜索 ========== */
+  $('#btnChatSearch').addEventListener('click', function () {
+    var bar = $('#searchBar');
+    bar.hidden = !bar.hidden;
+    if (!bar.hidden) $('#searchInput').focus();
+    else { $('#searchInput').value = ''; renderChatList(''); }
+  });
+  $('#searchInput').addEventListener('input', function () {
+    renderChatList(this.value.trim());
+  });
+  $('#btnChatAdd').addEventListener('click', function () {
+    resetAddContactForm();
+    showView('viewAddContact');
+  });
+
+  /* ========== 底部导航 ========== */
+  $all('.tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      currentId = null;
+      clearTimeout(replyTimer);
+      applyWall(null);
+      showView(this.dataset.view);
+      if (this.dataset.view === 'viewChats') renderChatList(currentFilter());
+    });
+  });
+
+  /* ========== 返回 ========== */
+  $all('[data-back]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = this.dataset.back;
+      showView(target);
+      if (target === 'viewMe') renderProfile();
+      if (target === 'viewContacts') renderContacts();
+      if (target === 'viewDiscover') updateMomentsCount();
+      if (target === 'viewMoments') renderMoments();
+      if (target === 'viewSettings') { renderSpeedOptions(); updateDataStats(); }
+    });
+  });
+
+  /* ========== 通讯录入口 ========== */
+  $('#btnAddContact').addEventListener('click', function () {
+    resetAddContactForm();
+    showView('viewAddContact');
+  });
+  $('#cellNewFriend').addEventListener('click', function () { toast('暂无新的朋友'); });
+  $('#cellGroupChat').addEventListener('click', function () { toast('暂无群聊'); });
+
+  /* ========== 添加联系人 ========== */
+  function resetAddContactForm() {
+    newAvatarData = null;
+    var av = $('#addAvatar');
+    av.innerHTML = '?';
+    av.style.background = '#5b8def';
+    av.dataset.colorIdx = '0';
+    $('#addName').value = '';
+    $('#addWechatId').value = '';
+    $('#addRemark').value = '';
+    $('#addTag').value = '';
+  }
+
+  var addAvatarPressTimer = null;
+  var addAvatarLongPressed = false;
+
+  $('#addAvatarPicker').addEventListener('touchstart', function () {
+    addAvatarLongPressed = false;
+    addAvatarPressTimer = setTimeout(function () {
+      addAvatarLongPressed = true;
+      var av = $('#addAvatar');
+      var current = av.dataset.colorIdx ? parseInt(av.dataset.colorIdx, 10) : 0;
+      current = (current + 1) % AVATAR_COLORS.length;
+      av.dataset.colorIdx = current;
+      av.style.background = AVATAR_COLORS[current];
+      av.innerHTML = '?';
+      newAvatarData = null;
+    }, 600);
+  });
+  $('#addAvatarPicker').addEventListener('touchend', function () {
+    clearTimeout(addAvatarPressTimer);
+    if (!addAvatarLongPressed) $('#addAvatarInput').click();
+  });
+  $('#addAvatarPicker').addEventListener('touchmove', function () {
+    clearTimeout(addAvatarPressTimer);
+  });
+  $('#addAvatarPicker').addEventListener('click', function (e) {
+    if (e.detail === 0) return;
+    if (window.matchMedia('(hover: hover)').matches) $('#addAvatarInput').click();
+  });
+
+  $('#addAvatarInput').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) { this.value = ''; return; }
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      newAvatarData = ev.target.result;
+      var av = $('#addAvatar');
+      av.innerHTML = '<img src="' + newAvatarData + '" alt="" />';
+    };
+    reader.readAsDataURL(file);
+    this.value = '';
+  });
+
+  $('#btnSubmitAdd').addEventListener('click', function () {
+    var name = $('#addName').value.trim();
+    var wxId = $('#addWechatId').value.trim();
+    var remark = $('#addRemark').value.trim();
+    var tag = $('#addTag').value.trim();
+    if (!name && !wxId) { toast('请填写昵称或微信号'); return; }
+
+    var newId = 'p' + (people.length + 1 + '_' + Date.now());
+    var display = name || remark || ('朋友');
+    people.push({
+      id: newId,
+      name: name || display,
+      color: AVATAR_COLORS[people.length % AVATAR_COLORS.length],
+      avatar: newAvatarData,
+      wechatId: wxId || ('wxid_' + Math.random().toString(36).slice(2, 8)),
+      status: '刚刚添加',
+      letter: (display.charAt(0) || '#').toUpperCase(),
+      remark: remark,
+      tag: tag,
+      wall: null
+    });
+    chats[newId] = { unread: 0, messages: [] };
+
+    newAvatarData = null;
+    renderContacts();
+    renderChatList(currentFilter());
+    updateDataStats();
+    toast('已添加联系人');
+    showView('viewContacts');
+  });
+
+  /* ========== 编辑联系人 ========== */
+  function openEditContact(id) {
+    var p = personById(id);
+    if (!p) return;
+    editingContactId = id;
+    editContactAvatarData = p.avatar || null;
+    var name = displayName(p);
+    var av = $('#editContactAvatar');
+    if (p.avatar) av.innerHTML = '<img src="' + p.avatar + '" alt="" />';
+    else av.textContent = initialOf(name);
+    av.style.background = p.color;
+
+    $('#editContactName').value = p.name;
+    $('#editContactWechatId').value = p.wechatId || '';
+    $('#editContactRemark').value = p.remark || '';
+    $('#editContactTag').value = p.tag || '';
+    showView('viewEditContact');
+  }
+
+  var contactAvatarPressTimer = null;
+  var contactAvatarLongPressed = false;
+
+  $('#contactAvatarPicker').addEventListener('touchstart', function () {
+    contactAvatarLongPressed = false;
+    contactAvatarPressTimer = setTimeout(function () {
+      contactAvatarLongPressed = true;
+      var p = personById(editingContactId);
+      if (!p) return;
+      var idx = AVATAR_COLORS.indexOf(p.color);
+      idx = (idx + 1) % AVATAR_COLORS.length;
+      p.color = AVATAR_COLORS[idx];
+      editContactAvatarData = null;
+      var av = $('#editContactAvatar');
+      av.innerHTML = initialOf(displayName(p));
+      av.style.background = p.color;
+    }, 600);
+  });
+  $('#contactAvatarPicker').addEventListener('touchend', function () {
+    clearTimeout(contactAvatarPressTimer);
+    if (!contactAvatarLongPressed) $('#contactAvatarInput').click();
+  });
+  $('#contactAvatarPicker').addEventListener('touchmove', function () {
+    clearTimeout(contactAvatarPressTimer);
+  });
+  $('#contactAvatarPicker').addEventListener('click', function (e) {
+    if (e.detail === 0) return;
+    if (window.matchMedia('(hover: hover)').matches) $('#contactAvatarInput').click();
+  });
+
+  $('#contactAvatarInput').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) { this.value = ''; return; }
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      editContactAvatarData = ev.target.result;
+      var av = $('#editContactAvatar');
+      av.innerHTML = '<img src="' + editContactAvatarData + '" alt="" />';
+    };
+    reader.readAsDataURL(file);
+    this.value = '';
+  });
+
+  $('#btnEditContactBack').addEventListener('click', function () {
+    if (profileContactId) openContactProfile(profileContactId);
+    else showView('viewContacts');
+  });
+
+  $('#btnSaveContact').addEventListener('click', function () {
+    var p = personById(editingContactId);
+    if (!p) return;
+    var name = $('#editContactName').value.trim();
+    if (!name) { toast('昵称不能为空'); return; }
+    p.name = name;
+    p.wechatId = $('#editContactWechatId').value.trim();
+    p.remark = $('#editContactRemark').value.trim();
+    p.tag = $('#editContactTag').value.trim();
+    p.avatar = editContactAvatarData;
+    p.letter = (displayName(p).charAt(0) || '#').toUpperCase();
+
+    renderContacts();
+    renderChatList(currentFilter());
+    if (currentId === editingContactId) {
+      $('#chatName').textContent = displayName(p);
+      renderMessages();
+    }
+    if (profileContactId === editingContactId) openContactProfile(editingContactId);
+
+    toast('联系人已更新');
+    if (profileContactId === editingContactId) showView('viewContactProfile');
+    else if (currentId === editingContactId) showView('viewChat');
+    else showView('viewContacts');
+  });
+
+  $('#btnDeleteContact').addEventListener('click', function () {
+    var p = personById(editingContactId);
+    if (!p) return;
+    if (!confirm('确定删除联系人「' + displayName(p) + '」吗？')) return;
+    var deletedId = editingContactId;
+    people = people.filter(function (x) { return x.id !== deletedId; });
+    delete chats[deletedId];
+    if (currentId === deletedId) currentId = null;
+    if (profileContactId === deletedId) profileContactId = null;
+    editingContactId = null;
+    renderContacts();
+    renderChatList(currentFilter());
+    updateTabDots();
+    updateDataStats();
+    toast('联系人已删除');
+    showView('viewContacts');
+  });
+
+  /* ========== 设置：字卡发送速度 ========== */
+  function renderSpeedOptions() {
+    var opts = $all('.speed-opt');
+    for (var i = 0; i < opts.length; i++) {
+      var v = parseInt(opts[i].dataset.speed, 10);
+      opts[i].classList.toggle('active', v === cardSpeed);
+    }
+    $('#speedSlider').value = cardSpeed;
+    $('#speedLabel').textContent = (cardSpeed / 1000).toFixed(1) + ' 秒';
+  }
+
+  $all('.speed-opt').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      cardSpeed = parseInt(this.dataset.speed, 10);
+      renderSpeedOptions();
+      toast('已设置为 ' + (cardSpeed / 1000).toFixed(1) + ' 秒');
+    });
+  });
+
+  $('#speedSlider').addEventListener('input', function () {
+    cardSpeed = parseInt(this.value, 10);
+    $('#speedLabel').textContent = (cardSpeed / 1000).toFixed(1) + ' 秒';
+    var opts = $all('.speed-opt');
+    for (var i = 0; i < opts.length; i++) {
+      opts[i].classList.toggle('active', parseInt(opts[i].dataset.speed, 10) === cardSpeed);
+    }
+  });
+
+  /* ========== 数据统计与导出导入 ========== */
+  function countMessages() {
+    var n = 0;
+    for (var k in chats) if (chats.hasOwnProperty(k)) n += (chats[k].messages || []).length;
+    return n;
+  }
+
+  function updateDataStats() {
+    var el1 = $('#statContacts'); if (el1) el1.textContent = people.length;
+    var el2 = $('#statMessages'); if (el2) el2.textContent = countMessages();
+    var el3 = $('#statCards'); if (el3) el3.textContent = cards.length;
+    var el4 = $('#statMoments'); if (el4) el4.textContent = moments.length;
+  }
+
+  function exportData() {
+    var data = {
+      app: '字卡聊天',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      myProfile: myProfile,
+      people: people,
+      chats: chats,
+      cards: cards,
+      moments: moments,
+      settings: {
+        cardSpeed: cardSpeed,
+        currentWallId: currentWall.id,
+        currentBubbleId: currentBubble.id,
+        globalWallImage: globalWallImage
+      }
+    };
+
+    var json = JSON.stringify(data, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var stamp = new Date();
+    var fname = '字卡聊天备份_' +
+      stamp.getFullYear() +
+      String(stamp.getMonth() + 1).padStart(2, '0') +
+      String(stamp.getDate()).padStart(2, '0') + '_' +
+      String(stamp.getHours()).padStart(2, '0') +
+      String(stamp.getMinutes()).padStart(2, '0') + '.json';
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    toast('数据已导出');
+  }
+
+  function importDataFromFile(file) {
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      try {
+        var data = JSON.parse(ev.target.result);
+        if (!data || typeof data !== 'object') throw new Error('格式错误');
+
+        if (data.myProfile && typeof data.myProfile === 'object') {
+          myProfile = Object.assign({
+            name: '我的昵称', wechatId: 'wxid_100248', sign: '', gender: '保密',
+            region: '', color: '#2f6bff', avatar: null
+          }, data.myProfile);
+        }
+        if (Array.isArray(data.people)) people = data.people;
+        if (data.chats && typeof data.chats === 'object') chats = data.chats;
+        if (Array.isArray(data.cards)) cards = data.cards;
+        if (Array.isArray(data.moments)) moments = data.moments;
+
+        if (data.settings && typeof data.settings === 'object') {
+          if (typeof data.settings.cardSpeed === 'number') cardSpeed = data.settings.cardSpeed;
+          if (data.settings.currentWallId) {
+            for (var i = 0; i < WALLS.length; i++) {
+              if (WALLS[i].id === data.settings.currentWallId) { currentWall = WALLS[i]; break; }
+            }
+          }
+          if (data.settings.currentBubbleId) {
+            for (var j = 0; j < BUBBLES.length; j++) {
+              if (BUBBLES[j].id === data.settings.currentBubbleId) { currentBubble = BUBBLES[j]; break; }
+            }
+          }
+          if (typeof data.settings.globalWallImage === 'string' || data.settings.globalWallImage === null) {
+            globalWallImage = data.settings.globalWallImage;
+          }
+        }
+
+        // 确保每个联系人都有一条 chat 记录
+        people.forEach(function (p) {
+          if (!chats[p.id]) chats[p.id] = { unread: 0, messages: [] };
+        });
+
+        // 重置状态
+        currentId = null;
+        editingContactId = null;
+        profileContactId = null;
+
+        applyWall(null);
+        applyBubble();
+        renderChatList('');
+        renderContacts();
+        renderProfile();
+        renderCardList();
+        renderMoments();
+        renderSpeedOptions();
+        updateDataStats();
+        updateTabDots();
+        updateMomentsCount();
+
+        toast('数据导入成功');
+        showView('viewMe');
+      } catch (err) {
+        toast('导入失败：文件格式不正确');
+      }
+    };
+    reader.onerror = function () { toast('读取文件失败'); };
+    reader.readAsText(file);
+  }
+
+  $('#btnExportData').addEventListener('click', exportData);
+
+  $('#btnImportData').addEventListener('click', function () {
+    $('#importInput').click();
+  });
+
+  $('#importInput').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) { this.value = ''; return; }
+    importDataFromFile(file);
+    this.value = '';
+  });
+
+  $('#btnResetData').addEventListener('click', function () {
+    if (!confirm('确定清空所有数据吗？此操作不可恢复。')) return;
+    people = [];
+    chats = {};
+    cards = [];
+    moments = [];
+    globalWallImage = null;
+    myProfile = { name: '我的昵称', wechatId: 'wxid_100248', sign: '', gender: '保密', region: '', color: '#2f6bff', avatar: null };
+    currentWall = WALLS[0];
+    currentBubble = BUBBLES[0];
+    cardSpeed = 1200;
+    currentId = null;
+
+    applyWall(null);
+    applyBubble();
+    renderChatList('');
+    renderContacts();
+    renderProfile();
+    renderCardList();
+    renderMoments();
+    renderSpeedOptions();
+    updateDataStats();
+    updateTabDots();
+    updateMomentsCount();
+    toast('已清空所有数据');
+    showView('viewMe');
+  });
+
+  /* ========== 发现页 ========== */
+  $('#cellScan').addEventListener('click', function () { toast('扫一扫功能暂未开放'); });
+  $('#cellMoments').addEventListener('click', function () {
+    renderMoments();
+    showView('viewMoments');
+  });
+  $('#cellCards').addEventListener('click', function () {
+    renderCardList();
+    showView('viewCards');
+  });
+  $('#cellWall').addEventListener('click', function () {
+    renderWallGrid();
+    showView('viewWallpaper');
+  });
+  $('#cellBubble').addEventListener('click', function () {
+    renderBubbleGrid();
+    showView('viewBubble');
+  });
+
+  /* ========== 朋友圈 ========== */
+  function updateMomentsCount() {
+    var el = $('#momentsCount');
+    if (el) el.textContent = moments.length ? String(moments.length) : '';
+  }
+
+  function renderMoments() {
+    var box = $('#momentList');
+    if (!moments.length) {
+      box.innerHTML = '<div class="empty-tip">暂无动态，点击右上角发布</div>';
+      updateMomentsCount();
+      return;
+    }
+    var html = '';
+    moments.forEach(function (m) {
+      var imgs = '';
+      if (m.images && m.images.length) {
+        imgs = '<div class="moment-imgs">';
+        m.images.forEach(function (src) { imgs += '<img src="' + src + '" alt="" />'; });
+        imgs += '</div>';
+      }
+      var avHTML;
+      if (m.avatar) {
+        avHTML = '<span class="avatar" style="background:' + m.color + '"><img src="' + m.avatar + '" alt="" /></span>';
+      } else {
+        avHTML = '<span class="avatar" style="background:' + m.color + '">' + esc(initialOf(m.author)) + '</span>';
+      }
+      html +=
+        '<div class="moment" data-id="' + m.id + '">' +
+          avHTML +
+          '<div class="moment-main">' +
+            '<div class="moment-name">' + esc(m.author) + '</div>' +
+            (m.text ? '<div class="moment-text">' + esc(m.text) + '</div>' : '') +
+            imgs +
+            '<div class="moment-meta">' +
+              '<span class="time">' + esc(m.time) + '</span>' +
+              '<button class="moment-del" type="button" data-del="' + m.id + '">删除</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    });
+    box.innerHTML = html;
+    updateMomentsCount();
+  }
+
+  $('#momentList').addEventListener('click', function (e) {
+    var del = e.target.closest('[data-del]');
+    if (del) {
+      var id = del.dataset.del;
+      moments = moments.filter(function (m) { return m.id !== id; });
+      renderMoments();
+      updateDataStats();
+      toast('已删除');
+    }
+  });
+
+  function resetMomentForm() {
+    momentImages = [];
+    $('#momentText').value = '';
+    renderMomentThumbs();
+  }
+
+  function renderMomentThumbs() {
+    var box = $('#momentThumbs');
+    var html = '';
+    momentImages.forEach(function (src, i) {
+      html +=
+        '<div class="thumb">' +
+          '<img src="' + src + '" alt="" />' +
+          '<button type="button" data-idx="' + i + '">×</button>' +
+        '</div>';
+    });
+    box.innerHTML = html;
+  }
+
+  $('#momentThumbs').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-idx]');
+    if (btn) {
+      var idx = parseInt(btn.dataset.idx, 10);
+      momentImages.splice(idx, 1);
+      renderMomentThumbs();
+    }
+  });
+
+  $('#btnNewMoment').addEventListener('click', function () {
+    resetMomentForm();
+    showView('viewNewMoment');
+  });
+
+  $('#btnPickMomentImg').addEventListener('click', function () {
+    $('#momentImgInput').click();
+  });
+
+  $('#momentImgInput').addEventListener('change', function (e) {
+    var files = e.target.files;
+    if (!files || !files.length) return;
+    var remaining = 9 - momentImages.length;
+    var list = Array.prototype.slice.call(files).slice(0, remaining);
+
+    var loaded = 0;
+    list.forEach(function (file) {
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        momentImages.push(ev.target.result);
+        loaded++;
+        if (loaded === list.length) renderMomentThumbs();
+      };
+      reader.readAsDataURL(file);
+    });
+    this.value = '';
+    if (files.length > remaining) toast('最多 9 张图片');
+  });
+
+  function publishMoment() {
+    var text = $('#momentText').value.trim();
+    if (!text && !momentImages.length) { toast('请输入内容或添加图片'); return; }
+
+    moments.unshift({
+      id: 'm' + Date.now(),
+      author: myProfile.name,
+      color: myProfile.color,
+      avatar: myProfile.avatar,
+      text: text,
+      images: momentImages.slice(),
+      time: nowDate()
+    });
+
+    resetMomentForm();
+    renderMoments();
+    updateDataStats();
+    toast('已发表');
+    showView('viewMoments');
+  }
+
+  $('#btnPublishMoment').addEventListener('click', publishMoment);
+  $('#btnPublishMoment2').addEventListener('click', publishMoment);
+
+  /* ========== 字卡管理 ========== */
+  function renderCardList() {
+    var box = $('#cardList');
+    if (!cards.length) {
+      box.innerHTML = '<div class="empty-tip">暂无字卡，请在上方输入后添加</div>';
+    } else {
+      var html = '';
+      cards.forEach(function (c) {
+        html +=
+          '<div class="card-item" data-id="' + c.id + '">' +
+            '<div class="card-main">' +
+              '<div class="card-title">' + esc(c.title) + '</div>' +
+              '<div class="card-content">' + esc(c.content) + '</div>' +
+              (c.tag ? '<span class="card-tag">' + esc(c.tag) + '</span>' : '') +
+            '</div>' +
+            '<button class="card-del" type="button" data-del="' + c.id + '" aria-label="删除">' +
+              '<svg class="icon sm"><use href="#i-trash"/></svg>' +
+            '</button>' +
+          '</div>';
+      });
+      box.innerHTML = html;
+    }
+    updateCardsCount();
+  }
+
+  function updateCardsCount() {
+    var txt = cards.length ? String(cards.length) : '';
+    var el = $('#cardsCount'); if (el) el.textContent = txt;
+    var el2 = $('#myCardsCount'); if (el2) el2.textContent = txt;
+  }
+
+  $('#cardList').addEventListener('click', function (e) {
+    var del = e.target.closest('[data-del]');
+    if (del) {
+      var id = del.dataset.del;
+      cards = cards.filter(function (c) { return c.id !== id; });
+      renderCardList();
+      updateDataStats();
+      toast('已删除');
+    }
+  });
+
+  $('#btnBatchAddCard').addEventListener('click', function () {
+    var raw = $('#cardBatchInput').value;
+    if (!raw.trim()) { toast('请输入内容'); return; }
+
+    var lines = raw.split('\n');
+    var added = 0;
+
+    lines.forEach(function (line) {
+      var text = line.trim();
+      if (!text) return;
+      var title, content;
+      var idx = text.indexOf('|');
+      if (idx > -1) {
+        title = text.slice(0, idx).trim();
+        content = text.slice(idx + 1).trim();
+      } else {
+        title = text;
+        content = '';
+      }
+      if (!title) title = '未命名字卡';
+      cards.push({ id: 'c' + Date.now() + '_' + added, title: title, content: content, tag: '' });
+      added++;
+    });
+
+    $('#cardBatchInput').value = '';
+    renderCardList();
+    updateDataStats();
+    toast(added > 0 ? ('已添加 ' + added + ' 张字卡') : '没有可添加的内容');
+  });
+
+  $('#btnClearCards').addEventListener('click', function () {
+    if (!cards.length) { toast('暂无字卡'); return; }
+    if (!confirm('确定清空所有字卡吗？')) return;
+    cards = [];
+    renderCardList();
+    updateDataStats();
+    toast('已清空');
+  });
+
+  /* ========== 全局壁纸 ========== */
+  function renderWallGrid() {
+    var box = $('#wallGrid');
+    var html = '';
+    WALLS.forEach(function (w) {
+      var active = (!globalWallImage && w.id === currentWall.id);
+      html +=
+        '<div class="wall-item' + (active ? ' active' : '') + '" data-id="' + w.id + '" style="background:' + w.value + ';">' +
+          '<div class="check"><svg class="icon"><use href="#i-check"/></svg></div>' +
+        '</div>';
+    });
+    if (globalWallImage) {
+      html +=
+        '<div class="wall-item active" data-id="__global" style="background-image:url(' + globalWallImage + ');">' +
+          '<div class="check"><svg class="icon"><use href="#i-check"/></svg></div>' +
+        '</div>';
+    }
+    box.innerHTML = html;
+  }
+
+  $('#wallGrid').addEventListener('click', function (e) {
+    var item = e.target.closest('.wall-item');
+    if (!item) return;
+    var id = item.dataset.id;
+    if (id === '__global') return;
+    globalWallImage = null;
+    for (var i = 0; i < WALLS.length; i++) if (WALLS[i].id === id) { currentWall = WALLS[i]; break; }
+    applyWall(currentId);
+    renderWallGrid();
+    toast('已更换全局壁纸');
+  });
+
+  $('#btnPickWall').addEventListener('click', function () {
+    $('#wallInput').click();
+  });
+
+  $('#wallInput').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) { this.value = ''; return; }
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      globalWallImage = ev.target.result;
+      applyWall(currentId);
+      renderWallGrid();
+      toast('已使用相册壁纸');
+    };
+    reader.readAsDataURL(file);
+    this.value = '';
+  });
+
+  /* ========== 气泡 ========== */
+  function renderBubbleGrid() {
+    var box = $('#bubbleGrid');
+    var html = '';
+    BUBBLES.forEach(function (b) {
+      var active = (b.id === currentBubble.id);
+      html +=
+        '<div class="bubble-option' + (active ? ' active' : '') + '" data-id="' + b.id + '">' +
+          '<div class="preview">' +
+            '<div class="p-you" style="background:' + b.you + ';color:' + b.youText + ';border-radius:' + b.radius + ';border-bottom-left-radius:' + (b.tail ? '3px' : b.radius) + ';">你好</div>' +
+            '<div class="p-me" style="background:' + b.me + ';color:' + b.meText + ';border-radius:' + b.radius + ';border-bottom-right-radius:' + (b.tail ? '3px' : b.radius) + ';">收到</div>' +
+          '</div>' +
+          '<div class="opt-name">' + esc(b.name) + '</div>' +
+        '</div>';
+    });
+    box.innerHTML = html;
+  }
+
+  $('#bubbleGrid').addEventListener('click', function (e) {
+    var item = e.target.closest('.bubble-option');
+    if (!item) return;
+    var id = item.dataset.id;
+    for (var i = 0; i < BUBBLES.length; i++) if (BUBBLES[i].id === id) { currentBubble = BUBBLES[i]; break; }
+    applyBubble();
+    renderBubbleGrid();
+    toast('已更换气泡样式');
+  });
+
+  /* ========== 我 ========== */
+  function renderProfile() {
+    var av = $('#myAvatar');
+    if (myProfile.avatar) av.innerHTML = '<img src="' + myProfile.avatar + '" alt="" />';
+    else av.textContent = initialOf(myProfile.name);
+    av.style.background = myProfile.color;
+
+    $('#myName').textContent = myProfile.name;
+    $('#myId').textContent = '微信号：' + myProfile.wechatId;
+    var signEl = $('#mySign');
+    signEl.textContent = myProfile.sign || '';
+    signEl.hidden = !myProfile.sign;
+    updateCardsCount();
+  }
+
+  function openEditProfile() {
+    var av = $('#editAvatar');
+    if (myProfile.avatar) av.innerHTML = '<img src="' + myProfile.avatar + '" alt="" />';
+    else av.textContent = initialOf(myProfile.name);
+    av.style.background = myProfile.color;
+
+    $('#editName').value = myProfile.name;
+    $('#editWechatId').value = myProfile.wechatId;
+    $('#editSign').value = myProfile.sign || '';
+    $('#editGender').value = myProfile.gender || '保密';
+    $('#editRegion').value = myProfile.region || '';
+    showView('viewEditProfile');
+  }
+
+  $('#profileHeader').addEventListener('click', openEditProfile);
+  $('#cellEditProfile').addEventListener('click', openEditProfile);
+  $('#cellMyCard').addEventListener('click', function () {
+    renderCardList();
+    showView('viewCards');
+  });
+  $('#cellMyQr').addEventListener('click', function () { toast('我的二维码'); });
+  $('#cellSettings').addEventListener('click', function () {
+    renderSpeedOptions();
+    updateDataStats();
+    showView('viewSettings');
+  });
+
+  $('#btnSaveProfile').addEventListener('click', function () {
+    var name = $('#editName').value.trim();
+    var wxId = $('#editWechatId').value.trim();
+    if (!name) { toast('昵称不能为空'); return; }
+    if (!wxId) { toast('微信号不能为空'); return; }
+
+    myProfile.name = name;
+    myProfile.wechatId = wxId;
+    myProfile.sign = $('#editSign').value.trim();
+    myProfile.gender = $('#editGender').value;
+    myProfile.region = $('#editRegion').value.trim();
+
+    renderProfile();
+    renderMessages();
+    toast('资料已更新');
+    showView('viewMe');
+  });
+
+  var myAvatarPressTimer = null;
+  var myAvatarLongPressed = false;
+
+  $('#avatarPicker').addEventListener('touchstart', function () {
+    myAvatarLongPressed = false;
+    myAvatarPressTimer = setTimeout(function () {
+      myAvatarLongPressed = true;
+      var idx = AVATAR_COLORS.indexOf(myProfile.color);
+      idx = (idx + 1) % AVATAR_COLORS.length;
+      myProfile.color = AVATAR_COLORS[idx];
+      if (!myProfile.avatar) {
+        $('#editAvatar').style.background = myProfile.color;
+        $('#myAvatar').style.background = myProfile.color;
+      }
+    }, 600);
+  });
+  $('#avatarPicker').addEventListener('touchend', function () {
+    clearTimeout(myAvatarPressTimer);
+    if (!myAvatarLongPressed) $('#myAvatarInput').click();
+  });
+  $('#avatarPicker').addEventListener('touchmove', function () {
+    clearTimeout(myAvatarPressTimer);
+  });
+  $('#avatarPicker').addEventListener('click', function (e) {
+    if (e.detail === 0) return;
+    if (window.matchMedia('(hover: hover)').matches) $('#myAvatarInput').click();
+  });
+
+  $('#myAvatarInput').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) { this.value = ''; return; }
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      myProfile.avatar = ev.target.result;
+      var av = $('#editAvatar');
+      av.innerHTML = '<img src="' + myProfile.avatar + '" alt="" />';
+    };
+    reader.readAsDataURL(file);
+    this.value = '';
+  });
+
+  /* ========== 聊天输入 ========== */
+  $('#btnBack').addEventListener('click', closeChat);
+  $('#btnSend').addEventListener('click', sendMessage);
+  $('#msgInput').addEventListener('input', updateSendState);
+  $('#msgInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  /* ========== 初始化 ========== */
+  applyWall(null);
+  applyBubble();
+  renderChatList('');
+  renderContacts();
+  renderProfile();
+  renderCardList();
+  renderMoments();
+  updateMomentsCount();
+  renderSpeedOptions();
+  updateDataStats();
+  updateSendState();
+  updateTabDots();
+
+})();
+</script>
+</body>
+</html>
